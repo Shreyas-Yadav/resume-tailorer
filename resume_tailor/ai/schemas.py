@@ -1,6 +1,7 @@
 """Pydantic schemas for structured LLM outputs across the pipeline."""
 
-from pydantic import BaseModel
+import re
+from pydantic import BaseModel, Field, field_validator
 from typing import List
 
 
@@ -32,7 +33,14 @@ class SelectedProject(BaseModel):
 class MatchingResponse(BaseModel):
     selected_projects: List[SelectedProject]
     professional_summary: str
-    infrastructure_and_tools: str
+    infrastructure_and_tools: str = Field(
+        description="Comma-separated tools list. Plain text only — no markdown, no bold, no asterisks."
+    )
+
+    @field_validator("infrastructure_and_tools")
+    @classmethod
+    def strip_markdown_bold(cls, v: str) -> str:
+        return re.sub(r"\*\*(.+?)\*\*", r"\1", v)
 
 
 class BulletPointsResponse(BaseModel):

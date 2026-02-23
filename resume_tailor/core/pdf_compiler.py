@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Optional
 from rich.console import Console
 
+PDFLATEX_TIMEOUT = 120  # seconds — allow extra time for large/complex documents
+
 
 def compile_pdf(
     tex_path: str,
@@ -43,7 +45,7 @@ def compile_pdf(
             ],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=PDFLATEX_TIMEOUT,
         )
         if result.returncode != 0 and run == 1:
             if console:
@@ -53,16 +55,23 @@ def compile_pdf(
                 for line in log_lines:
                     if line.strip():
                         console.print(f"  [dim]{line}[/dim]")
+                log_file = pdf_dir / (tex_file.stem + ".log")
+                console.print(f"[yellow]Full log: {log_file}[/yellow]")
             return None
 
-    # Clean up auxiliary files
+    # Always clean non-log auxiliary files
     pdf_name = tex_file.stem + ".pdf"
-    for ext in [".aux", ".log", ".out", ".fls", ".fdb_latexmk", ".synctex.gz"]:
+    for ext in [".aux", ".out", ".fls", ".fdb_latexmk", ".synctex.gz"]:
         aux_file = pdf_dir / (tex_file.stem + ext)
         if aux_file.exists():
             aux_file.unlink()
 
+    # Only delete log on success (preserve it for debugging on failure)
+    log_file = pdf_dir / (tex_file.stem + ".log")
     pdf_path = pdf_dir / pdf_name
+    if pdf_path.exists() and log_file.exists():
+        log_file.unlink()
+
     if pdf_path.exists():
         if console:
             console.print(f"[green]PDF compiled: {pdf_path}[/green]")

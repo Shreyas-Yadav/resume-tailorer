@@ -3,6 +3,8 @@
 from typing import Optional
 from rich.console import Console
 
+HTTP_FETCH_TIMEOUT = 30  # seconds
+
 from ..ai.llm_client import LLMClient
 from ..ai.prompts import job_extraction_prompt
 from ..ai.schemas import JobPostingResponse
@@ -18,7 +20,7 @@ def fetch_job_page(url: str) -> str:
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-    response = requests.get(url, headers=headers, timeout=30)
+    response = requests.get(url, headers=headers, timeout=HTTP_FETCH_TIMEOUT)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -35,7 +37,7 @@ def fetch_job_page(url: str) -> str:
 
 def load_job_from_file(filepath: str) -> str:
     """Load job posting text from a file."""
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         return f.read()
 
 

@@ -21,25 +21,30 @@ Job posting text:
 ---"""
 
 
-def project_summary_prompt(project_name: str, readme_content: str, source_snippets: str, config_files: str) -> str:
+def project_summary_prompt(project_name: str, readme_content: str, dir_tree: str, dependency_contents: str, source_code: str) -> str:
     """Prompt to summarize a discovered project into a ProjectProfile."""
     return f"""Analyze this software project and provide a structured summary.
 
 Project directory name: {project_name}
+
+Directory structure:
+---
+{dir_tree}
+---
 
 README content:
 ---
 {readme_content}
 ---
 
-Source code snippets (first 50 lines of key files):
+Dependency / build files (actual contents):
 ---
-{source_snippets}
+{dependency_contents}
 ---
 
-Config/build files found:
+Source code (entry-point files first, then remaining files up to budget):
 ---
-{config_files}
+{source_code}
 ---
 
 Return a JSON object with these exact keys:
@@ -66,7 +71,7 @@ Existing Resume Projects:
 {existing_resume_projects}
 ---
 
-Projects Registry (name, description, tech):
+Projects Registry (name, description, tech, key_features, languages):
 ---
 {projects_json}
 ---
@@ -79,7 +84,7 @@ Return a JSON object with these exact keys:
   - "reasoning": why this project is relevant (string)
   - "suggested_angle": how to frame this project for the role (string)
 - "professional_summary": a rewritten 2-3 sentence professional summary tailored to this role. Use **bold** for key technologies and skills. Must be compelling and specific to the job. (string)
-- "infrastructure_and_tools": a reordered comma-separated list of infrastructure, tools, frameworks, and platforms for the Technical Skills section. Put the most job-relevant ones first. You may add tools from the job posting that the candidate likely knows, but NEVER remove tools already listed. (string)
+- "infrastructure_and_tools": a reordered comma-separated list of infrastructure, tools, frameworks, and platforms for the Technical Skills section. Put the most job-relevant ones first. You may add tools from the job posting that the candidate likely knows, but NEVER remove tools already listed. (string, no markdown formatting)
 
 CRITICAL RULES:
 - NEVER select two projects that are the same or overlapping. The "Existing Resume Projects" and "Discovered Projects" may contain different versions or subsets of the same project (e.g. a frontend and backend of the same app, or an existing project that was also discovered on disk). If an existing resume project and a discovered project refer to the same underlying work, pick only ONE of them — prefer the existing version since it already has polished content.
@@ -92,8 +97,11 @@ Prioritize projects that:
 4. Are most impressive and differentiated"""
 
 
-def bullet_generation_prompt(project_name: str, project_description: str, project_tech: str, job_title: str, job_tech: str, suggested_angle: str) -> str:
+def bullet_generation_prompt(project_name: str, project_description: str, project_tech: str, job_title: str, job_tech: str, suggested_angle: str, key_features=None) -> str:
     """Prompt to generate tailored bullet points for a selected project."""
+    features_section = (
+        "\n".join(f"- {f}" for f in key_features) if key_features else "(none provided)"
+    )
     return f"""Generate resume bullet points for this project, tailored to a {job_title} role.
 
 Project: {project_name}
@@ -101,6 +109,8 @@ Description: {project_description}
 Technologies used: {project_tech}
 Job's key technologies: {job_tech}
 Suggested framing angle: {suggested_angle}
+Key features / achievements:
+{features_section}
 
 Return a JSON object with these exact keys:
 - "display_name": concise project name for the resume heading (string)

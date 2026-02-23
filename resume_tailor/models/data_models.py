@@ -22,6 +22,8 @@ class ProjectEntry:
     path: str
     description: str
     tech: List[str]
+    key_features: List[str] = field(default_factory=list)
+    languages: List[str] = field(default_factory=list)
 
 
 @dataclass

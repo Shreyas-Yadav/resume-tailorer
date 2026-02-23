@@ -70,24 +70,134 @@ def find_project_roots(scan_dirs: List[str]) -> List[Path]:
     return roots
 
 
+_README_LIMIT        = 15_000  # max chars to read from README
+_SOURCE_BUDGET_CHARS = 100_000  # global char budget across all source files
+_SOURCE_PER_FILE_CHARS = 8_000
+_SOURCE_PER_FILE_LINES = 300
+_DEP_FILE_LIMIT      = 3_000   # max chars per dependency manifest
+
+DEPENDENCY_FILES = [
+    "requirements.txt", "pyproject.toml", "package.json",
+    "go.mod", "Cargo.toml", "setup.py", "setup.cfg",
+    "Pipfile", "pom.xml", "build.gradle",
+]
+_DEP_FILE_BLACKLIST = {"poetry.lock", "yarn.lock", "package-lock.json", "Pipfile.lock"}
+
+_ENTRY_POINT_NAMES = {
+    "main.py", "app.py", "server.py", "index.py", "run.py",
+    "main.go", "main.rs", "main.js", "index.js", "server.js",
+    "app.js", "index.ts", "app.ts", "server.ts", "main.ts",
+    "Main.java", "Application.java", "main.c", "main.cpp",
+}
+
+_SKIP_DIRS = {"node_modules", "__pycache__", "venv", ".venv", "dist", "build", "target", "vendor", ".git"}
+
+
 def _read_readme(project_root: Path) -> str:
-    """Read the README file if it exists."""
+    """Read up to _README_LIMIT characters from the README file if it exists."""
     for name in ["README.md", "README.rst", "README.txt", "README"]:
         readme = project_root / name
         if readme.exists():
             try:
-                content = readme.read_text(errors="ignore")
-                # Truncate very long READMEs
-                if len(content) > 5000:
-                    content = content[:5000] + "\n... (truncated)"
+                with readme.open(encoding="utf-8", errors="ignore") as f:
+                    content = f.read(_README_LIMIT + 1)
+                if len(content) > _README_LIMIT:
+                    content = content[:_README_LIMIT] + "\n... (truncated)"
                 return content
             except Exception:
                 pass
     return "(no README found)"
 
 
+def _build_dir_tree(project_root: Path) -> str:
+    """Build a directory tree string (up to 3 levels deep, max 300 entries)."""
+    lines = [project_root.name + "/"]
+    entry_count = 0
+
+    def _walk(path: Path, prefix: str, depth: int) -> None:
+        nonlocal entry_count
+        if depth > 3 or entry_count >= 300:
+            return
+        try:
+            children = sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+        except PermissionError:
+            return
+
+        visible = [c for c in children if not c.name.startswith(".") and c.name not in _SKIP_DIRS]
+        for i, child in enumerate(visible):
+            if entry_count >= 300:
+                lines.append(prefix + "└── ...")
+                return
+            connector = "└── " if i == len(visible) - 1 else "├── "
+            lines.append(prefix + connector + child.name + ("/" if child.is_dir() else ""))
+            entry_count += 1
+            if child.is_dir():
+                extension = "    " if i == len(visible) - 1 else "│   "
+                _walk(child, prefix + extension, depth + 1)
+
+    _walk(project_root, "", 1)
+    return "\n".join(lines)
+
+
+def _read_dependency_files(project_root: Path) -> str:
+    """Read actual contents of dependency/build manifests at the project root."""
+    sections = []
+    for fname in DEPENDENCY_FILES:
+        if fname in _DEP_FILE_BLACKLIST:
+            continue
+        fpath = project_root / fname
+        if fpath.exists():
+            try:
+                content = fpath.read_text(encoding="utf-8", errors="ignore")
+                if len(content) > _DEP_FILE_LIMIT:
+                    content = content[:_DEP_FILE_LIMIT] + "\n... (truncated)"
+                sections.append(f"--- {fname} ---\n{content}")
+            except Exception:
+                pass
+    return "\n\n".join(sections) if sections else "(no dependency files found)"
+
+
+def _read_all_source_files(project_root: Path) -> str:
+    """Read source files with a global char budget; entry-point files are read first."""
+    priority: list[Path] = []
+    rest: list[Path] = []
+
+    for dirpath, dirnames, filenames in os.walk(project_root):
+        dirnames[:] = [
+            d for d in dirnames
+            if not d.startswith(".") and d not in _SKIP_DIRS
+        ]
+        for fname in filenames:
+            fpath = Path(dirpath) / fname
+            if fpath.suffix in SOURCE_EXTENSIONS:
+                if fname in _ENTRY_POINT_NAMES:
+                    priority.append(fpath)
+                else:
+                    rest.append(fpath)
+
+    snippets = []
+    total_chars = 0
+
+    for fpath in priority + rest:
+        if total_chars >= _SOURCE_BUDGET_CHARS:
+            break
+        try:
+            raw = fpath.read_text(encoding="utf-8", errors="ignore")
+            lines = raw.split("\n")[:_SOURCE_PER_FILE_LINES]
+            chunk = "\n".join(lines)
+            if len(chunk) > _SOURCE_PER_FILE_CHARS:
+                chunk = chunk[:_SOURCE_PER_FILE_CHARS] + "\n... (truncated)"
+            rel = fpath.relative_to(project_root)
+            snippets.append(f"--- {rel} ---\n{chunk}")
+            total_chars += len(chunk)
+        except Exception:
+            pass
+
+    return "\n\n".join(snippets) if snippets else "(no source files found)"
+
+
 def _sample_source_files(project_root: Path, max_files: int = 10, max_lines: int = 50) -> str:
-    """Read first N lines of up to M source files."""
+    """Read first N lines of up to M source files. (Kept for backwards compatibility.)"""
     snippets = []
     count = 0
 
@@ -100,7 +210,7 @@ def _sample_source_files(project_root: Path, max_files: int = 10, max_lines: int
             fpath = Path(dirpath) / fname
             if fpath.suffix in SOURCE_EXTENSIONS:
                 try:
-                    lines = fpath.read_text(errors="ignore").split("\n")[:max_lines]
+                    lines = fpath.read_text(encoding="utf-8", errors="ignore").split("\n")[:max_lines]
                     rel = fpath.relative_to(project_root)
                     snippets.append(f"--- {rel} ---\n" + "\n".join(lines))
                     count += 1
@@ -113,7 +223,7 @@ def _sample_source_files(project_root: Path, max_files: int = 10, max_lines: int
 
 
 def _list_config_files(project_root: Path) -> str:
-    """List config/build files present in the project root."""
+    """List config/build files present in the project root. (Kept for backwards compatibility.)"""
     found = []
     for name in sorted(CONFIG_FILES):
         if (project_root / name).exists():
@@ -126,11 +236,12 @@ def profile_project(
     llm: LLMClient,
 ) -> ProjectProfile:
     """Use LLM to summarize a single project into a ProjectProfile."""
-    readme = _read_readme(project_root)
-    sources = _sample_source_files(project_root)
-    configs = _list_config_files(project_root)
+    readme  = _read_readme(project_root)
+    tree    = _build_dir_tree(project_root)
+    deps    = _read_dependency_files(project_root)
+    sources = _read_all_source_files(project_root)
 
-    prompt = project_summary_prompt(project_root.name, readme, sources, configs)
+    prompt = project_summary_prompt(project_root.name, readme, tree, deps, sources)
     data = llm.generate_structured(prompt, ProjectProfileResponse, temperature=0.3)
 
     return ProjectProfile(
@@ -156,8 +267,14 @@ def profile_projects(
         try:
             profile = profile_project(root, llm)
             profiles.append(profile)
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
+            error_type = type(e).__name__
             if console:
-                console.print(f"  [yellow]Skipped {root.name}: {e}[/yellow]")
+                console.print(f"  [yellow]Skipped {root.name} ({error_type}): {e}[/yellow]")
+            else:
+                import sys
+                print(f"  Skipped {root.name} ({error_type}): {e}", file=sys.stderr)
 
     return profiles

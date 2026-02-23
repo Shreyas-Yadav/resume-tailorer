@@ -20,7 +20,7 @@ def parse_projects_md(filepath: str) -> List[ProjectEntry]:
     if not path.exists():
         raise FileNotFoundError(f"Projects file not found: {filepath}")
 
-    content = path.read_text()
+    content = path.read_text(encoding="utf-8")
     entries = []
 
     # Split by ## headings
@@ -33,7 +33,7 @@ def parse_projects_md(filepath: str) -> List[ProjectEntry]:
 
         lines = section.split("\n")
         name = lines[0].strip()
-        if not name:
+        if not name or name.startswith("#"):
             continue
 
         body = "\n".join(lines[1:])
@@ -43,11 +43,19 @@ def parse_projects_md(filepath: str) -> List[ProjectEntry]:
         tech_str = _extract_field(body, "Tech") or ""
         tech = [t.strip() for t in tech_str.split(",") if t.strip()]
 
+        key_features_str = _extract_field(body, "Key-Features") or ""
+        key_features = [f.strip() for f in key_features_str.split("|") if f.strip()]
+
+        languages_str = _extract_field(body, "Languages") or ""
+        languages = [l.strip() for l in languages_str.split(",") if l.strip()]
+
         entries.append(ProjectEntry(
             name=name,
             path=proj_path,
             description=description,
             tech=tech,
+            key_features=key_features,
+            languages=languages,
         ))
 
     return entries
@@ -72,6 +80,10 @@ def write_projects_md(filepath: str, entries: List[ProjectEntry]) -> None:
         lines.append(f"- **Path:** {entry.path}")
         lines.append(f"- **Description:** {entry.description}")
         lines.append(f"- **Tech:** {', '.join(entry.tech)}")
+        if entry.key_features:
+            lines.append(f"- **Key-Features:** {' | '.join(entry.key_features)}")
+        if entry.languages:
+            lines.append(f"- **Languages:** {', '.join(entry.languages)}")
         lines.append("")
 
-    path.write_text("\n".join(lines))
+    path.write_text("\n".join(lines), encoding="utf-8")

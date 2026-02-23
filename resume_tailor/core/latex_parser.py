@@ -61,8 +61,11 @@ def _make_section(name: str, start: int, end: int, lines: List[str]) -> ResumeSe
 
 def parse_resume(filepath: str) -> ExistingResume:
     """Parse a LaTeX resume file into structured ExistingResume."""
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
+
+    if not content.strip():
+        raise ValueError(f"Resume file is empty: {filepath}")
 
     lines = content.split("\n")
 

@@ -8,35 +8,54 @@ from ..ai.llm_client import LLMClient
 from ..ai.prompts import bullet_generation_prompt
 from ..ai.schemas import BulletPointsResponse, SelectedProject
 from ..models.data_models import JobPosting, ProjectEntry, TailoredProject
-from ..core.project_scanner import _read_readme, _sample_source_files, _list_config_files
+from ..core.project_scanner import _read_readme, _read_all_source_files, _read_dependency_files, _build_dir_tree
 
 
 def _find_registry_entry(name: str, registry: List[ProjectEntry]) -> Optional[ProjectEntry]:
-    """Find a project entry by name from the registry."""
+    """Find a project entry by name from the registry (case-insensitive exact match)."""
+    name_lower = name.strip().lower()
     for entry in registry:
-        if entry.name.lower() == name.lower() or name.lower() in entry.name.lower():
+        if entry.name.strip().lower() == name_lower:
             return entry
     return None
 
 
 def _deep_scan_project(entry: ProjectEntry) -> str:
-    """Read README + source snippets from a project directory for rich context."""
+    """Read README, dir tree, dependency files, and source code from a project directory for rich context."""
     project_root = Path(entry.path).expanduser().resolve()
     if not project_root.is_dir():
-        return f"Project: {entry.name}\nDescription: {entry.description}\nTech: {', '.join(entry.tech)}"
+        context = (
+            f"Project: {entry.name}\n"
+            f"Description: {entry.description}\n"
+            f"Tech: {', '.join(entry.tech)}\n"
+        )
+        if entry.key_features:
+            context += f"Key features: {' | '.join(entry.key_features)}\n"
+        if entry.languages:
+            context += f"Languages: {', '.join(entry.languages)}\n"
+        return context
 
-    readme = _read_readme(project_root)
-    sources = _sample_source_files(project_root)
-    configs = _list_config_files(project_root)
+    readme   = _read_readme(project_root)
+    tree     = _build_dir_tree(project_root)
+    deps     = _read_dependency_files(project_root)
+    sources  = _read_all_source_files(project_root)
 
-    return (
+    context = (
         f"Project: {entry.name}\n"
         f"Description: {entry.description}\n"
-        f"Tech: {', '.join(entry.tech)}\n\n"
-        f"README:\n{readme}\n\n"
-        f"Source snippets:\n{sources}\n\n"
-        f"Config files: {configs}"
+        f"Tech: {', '.join(entry.tech)}\n"
     )
+    if entry.key_features:
+        context += f"Key features: {' | '.join(entry.key_features)}\n"
+    if entry.languages:
+        context += f"Languages: {', '.join(entry.languages)}\n"
+    context += (
+        f"\nDirectory structure:\n{tree}\n\n"
+        f"README:\n{readme}\n\n"
+        f"Dependency / build files:\n{deps}\n\n"
+        f"Source code:\n{sources}"
+    )
+    return context
 
 
 def _get_project_context(
@@ -45,11 +64,11 @@ def _get_project_context(
     existing_projects: List[dict],
     console: Optional[Console] = None,
 ) -> tuple:
-    """Get description and tech for a selected project.
+    """Get description, tech, and key_features for a selected project.
 
     For registry projects, deep-scans the directory.
     For existing resume projects, uses the resume content.
-    Returns (description, tech_stack_str).
+    Returns (description, tech_stack_str, key_features).
     """
     # Check registry (deep-scan the dir)
     entry = _find_registry_entry(name, registry)
@@ -57,15 +76,18 @@ def _get_project_context(
         if console:
             console.print(f"    [dim]Deep-scanning {Path(entry.path).name}...[/dim]")
         deep_context = _deep_scan_project(entry)
-        return deep_context, ", ".join(entry.tech)
+        return deep_context, ", ".join(entry.tech), entry.key_features
 
-    # Fall back to existing resume projects
+    # Fall back to existing resume projects (case-insensitive exact match)
+    name_lower = name.strip().lower()
     for p in existing_projects:
-        if p["name"].lower() == name.lower() or name.lower() in p["name"].lower():
+        if p["name"].strip().lower() == name_lower:
             desc = " ".join(p.get("bullets", []))
-            return desc, p.get("tech_stack", "")
+            return desc, p.get("tech_stack", ""), []
 
-    return "", ""
+    if console:
+        console.print(f"    [yellow]Warning: no context found for project '{name}' — bullets may be generic[/yellow]")
+    return "", "", []
 
 
 def generate_bullets(
@@ -94,7 +116,7 @@ def generate_bullets(
         if console:
             console.print(f"  [dim]Writing bullets for {name}...[/dim]")
 
-        desc, tech = _get_project_context(name, registry, existing_projects, console)
+        desc, tech, key_features = _get_project_context(name, registry, existing_projects, console)
 
         prompt = bullet_generation_prompt(
             project_name=name,
@@ -103,6 +125,7 @@ def generate_bullets(
             job_title=job.title,
             job_tech=job_tech,
             suggested_angle=angle,
+            key_features=key_features,
         )
 
         data = llm.generate_structured(prompt, BulletPointsResponse, temperature=0.5)

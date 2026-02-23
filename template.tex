@@ -1,0 +1,214 @@
+%-------------------------
+% Resume in Latex
+% Author : Shreyas Yadav
+% Based off of: https://github.com/jakegut/resume
+% License : MIT
+%------------------------
+
+\documentclass[letterpaper,10pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+
+%----------FONT OPTIONS----------
+% sans-serif
+% \usepackage[sfdefault]{FiraSans}
+% \usepackage[sfdefault]{roboto}
+% \usepackage[sfdefault]{noto-sans}
+% \usepackage[default]{sourcesanspro}
+
+% serif
+% \usepackage{CormorantGaramond}
+% \usepackage{charter}
+
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.75in}
+\addtolength{\evensidemargin}{-0.75in}
+\addtolength{\textwidth}{1.5in}
+\addtolength{\topmargin}{-.75in}
+\addtolength{\textheight}{1.5in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-6pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-6pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-8pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-6pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+%----------HEADING----------
+\begin{center}
+    \textbf{\Huge \scshape Shreyas Yadav} \\ \vspace{1pt}
+    \small \href{https://shreyas-yadav.vercel.app/}{\textbf{Portfolio}} $|$ \href{mailto:ssyadav3@dons.usfca.edu}{\textbf{ssyadav3@dons.usfca.edu}} $|$
+    \href{https://www.linkedin.com/in/shreyas--yadav/}{\textbf{LinkedIn}} $|$
+    \href{https://github.com/Shreyas-Yadav}{\textbf{Github}} $|$
+    \small \href{+1-415-594-7919}{\textbf{+1-(415)-594-7919}}
+\end{center}
+
+
+%-----------PROFESSIONAL SUMMARY-----------
+\section{Professional Summary}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+     Software Engineer with 1+ years of experience in full-stack development and a passion for building scalable and reliable systems. Proficient in \textbf{Python}, \textbf{Java}, and \textbf{Node.js}, with hands-on experience in \textbf{cloud-native architectures}, \textbf{API development}, and \textbf{database management}. Eager to contribute to Flexport's innovative logistics solutions.
+    }}
+ \end{itemize}
+
+
+%-----------EXPERIENCE-----------
+\section{Experience}
+  \resumeSubHeadingListStart
+
+
+    \resumeSubheading
+      {Software Engineer Intern}{Jan. 2023 -- Jun. 2023}
+      {American Bureau of Shipping}{Maharashtra, India}
+      \resumeItemListStart
+        \resumeItem{Built full-stack performance management platform with \textbf{React} and \textbf{Spring Boot}, implementing comprehensive \textbf{validation workflows} and \textbf{automated testing} that reduced manual processing time by \textbf{35\%} for \textbf{400+ employees}}
+        \resumeItem{Designed \textbf{REST APIs} synchronizing \textbf{Oracle Database} and \textbf{IBM Maximo} in real-time, conducting \textbf{performance testing} and optimization that accelerated report generation by \textbf{40\%} through optimized data pipelines}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Web Developer Intern}{Oct. 2021 -- Apr. 2022}
+      {Starktech Ventures Pvt Ltd}{Maharashtra, India}
+      \resumeItemListStart
+        \resumeItem{Engineered full-stack e-commerce platform with \textbf{Laravel} and \textbf{JavaScript}, implementing \textbf{validation testing}, caching strategies and query optimization to reduce page load times by \textbf{60\%}}
+        \resumeItem{Integrated payment processing handling \textbf{50+ monthly transactions}, conducting rigorous \textbf{end-to-end testing} and checkout flow optimization that reduced cart abandonment by \textbf{20\%}}
+      \resumeItemListEnd
+
+\resumeSubheading
+      {Teaching Assistant}{Aug. 2025 -- Present}
+      {University of San Francisco}{San Francisco, CA}
+      \resumeItemListStart
+        \resumeItem{Instruct \textbf{80+ graduate and undergraduate students} across \textbf{System Foundations (CS631)} and \textbf{Computer Architecture (CS315)} courses, facilitating labs on \textbf{C programming}, \textbf{memory management}, and \textbf{RISC-V assembly}}
+        \resumeItem{Conduct code reviews and validation sessions for low-level systems projects involving \textbf{Unix system calls}, \textbf{pointers}, and \textbf{processor design}, ensuring compliance with autograder specifications}
+        \resumeItem{Manage technical support for \textbf{BeagleV hardware} and \textbf{Linux environments}, debugging student implementations of datapath logic and system-level software}
+      \resumeItemListEnd
+
+
+
+  \resumeSubHeadingListEnd
+
+
+%-----------PROJECTS-----------
+\section{Projects}
+    \resumeSubHeadingListStart
+
+    \resumeProjectHeading
+        {\textbf{YT-Analyzer: Cloud-Native Video Processing Platform} $|$ \emph{Python, AWS Lambda, API, MySQL, SQS}}{}
+        \resumeItemListStart
+        \resumeItem{\textbf{Serverless Architecture:} Designed and deployed a scalable serverless video processing platform using \textbf{Python}, \textbf{FastAPI}, and \textbf{AWS Lambda}, reducing infrastructure costs by \textbf{40\%} compared to traditional EC2 instances.}
+        \resumeItem{\textbf{Data Management \& Security:} Implemented a secure and reliable data layer using \textbf{RDS MySQL} within a \textbf{VPC}, ensuring data integrity and isolation while processing \textbf{10,000+ videos daily}.}
+        \resumeItem{\textbf{Scalable Pipeline:} Engineered a resilient worker pipeline with \textbf{SQS} and \textbf{S3}, enabling asynchronous video processing and handling peak loads with automatic scaling, improving processing time by \textbf{25\%}.}
+        \resumeItemListEnd
+
+    \resumeProjectHeading
+        {\textbf{Threat Radar: Container Security Scanner} $|$ \emph{Python, OpenAI, Grype, Syft, NetworkX}}{}
+        \resumeItemListStart
+        \resumeItem{\textbf{Vulnerability Scanning:} Developed a container security scanner using \textbf{Python}, \textbf{Grype}, and \textbf{Syft} to identify and report vulnerabilities, contributing to Google's open-source security initiatives.}
+        \resumeItem{\textbf{AI-Driven Risk Analysis:} Implemented \textbf{OpenAI} integration for intelligent risk assessment of identified vulnerabilities, prioritizing remediation efforts based on predicted impact and likelihood, enhancing security posture.}
+        \resumeItem{\textbf{Graph-Based Architecture:} Designed a graph-based security architecture using \textbf{NetworkX} to model container dependencies, enabling efficient vulnerability propagation analysis and proactive risk mitigation in \textbf{AWS} environments.}
+        \resumeItemListEnd
+
+    \resumeProjectHeading
+        {\textbf{Weather Application} $|$ \emph{Node.js, Docker, Express, API, Nginx}}{}
+        \resumeItemListStart
+        \resumeItem{\textbf{Microservices Architecture:} Developed a Dockerized weather application with a \textbf{Node.js/Express} backend and \textbf{Nginx} frontend, enhancing scalability and maintainability.}
+        \resumeItem{\textbf{API Integration:} Implemented real-time weather data fetching from the \textbf{OpenWeatherMap API} using \textbf{Axios}, incorporating error handling and data validation for a robust user experience.}
+        \resumeItem{\textbf{Containerization \& Orchestration:} Utilized \textbf{Docker} and \textbf{Docker Compose} to containerize the application, enabling easy deployment and consistent performance across different environments.}
+        \resumeItemListEnd
+    \resumeSubHeadingListEnd
+
+
+%-----------EDUCATION-----------
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {University of San Francisco}{San Francisco, CA}
+      {MS Computer Science (3.83/4.00)}{Aug. 2024 -- May 2026}
+  \resumeSubHeadingListEnd
+
+
+
+%-----------TECHNICAL SKILLS-----------
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+     \textbf{Languages}{: C, C++, Python, Java, SQL, PHP, JavaScript, TypeScript} \\
+     \textbf{Infrastructure \& Tools}{: Java, Python, Ruby, Node.js, Spring Boot, Ruby on Rails, React, AWS, Databases, API, Testing frameworks, Microservices, CI/CD, FastAPI, AWS Lambda, SQS, RDS MySQL, S3, Cloudflare, Nginx, Express, Docker, Docker Compose, OpenAI, Grype, Syft, NetworkX, TCP/UDP, POSIX Sockets, Linux} \\
+     \textbf{Coursework}{: Computer Networking, Operating Systems (Linux), Cloud Computing, System Foundations, Computer Architecture, DevOps.}
+    }}
+ \end{itemize}
+
+
+%-------------------------------------------
+\end{document}

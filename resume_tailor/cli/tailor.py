@@ -18,7 +18,7 @@ def tailor(
     provider: Optional[str] = typer.Option(None, "--provider", "-p", help="LLM provider (openai, anthropic, gemini)"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model name"),
     output_dir: Optional[str] = typer.Option(None, "--output-dir", "-o", help="Output directory"),
-    skip_pdf: bool = typer.Option(False, "--skip-pdf", help="Skip PDF compilation"),
+    pdf: bool = typer.Option(True, "--pdf/--no-pdf", help="Compile PDF after editing LaTeX (default: on)"),
 ):
     """Tailor your resume to a job posting using AI."""
     console = Console()
@@ -67,7 +67,7 @@ def tailor(
 
     # Wrap pipeline in try/except for clean error messages
     try:
-        _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, output_dir, skip_pdf)
+        _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, output_dir, pdf)
     except Exception as e:
         error_msg = str(e)
         if "RetryError" in type(e).__name__ and hasattr(e, "last_attempt"):
@@ -76,7 +76,7 @@ def tailor(
         raise typer.Exit(1)
 
 
-def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, output_dir, skip_pdf):
+def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, output_dir, pdf):
     """Run the 7-step tailoring pipeline."""
     # Step 1: Fetch job posting
     from ..core.job_fetcher import fetch_and_parse_job
@@ -131,7 +131,7 @@ def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, o
         text = _re.sub(r"[^a-z0-9]+", "-", text)
         return text.strip("-")
 
-    today = date.today().isoformat()
+    today = date.today().strftime("%b-%d-%Y")
     company_slug = _slugify(job.company or "unknown")
     title_slug = _slugify(job.title or "unknown")
     filename = f"{company_slug}-{title_slug}"
@@ -141,11 +141,12 @@ def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, o
     save_text(new_tex, str(tex_output), console, f"Tailored .tex saved to {tex_output}")
 
     # Step 7: Compile PDF
-    if not skip_pdf:
+    if pdf:
         from ..core.pdf_compiler import compile_pdf
         console.print("\n[bold]Step 7/7:[/bold] Compiling PDF...")
-        compile_pdf(str(tex_output), str(day_dir), console)
+        pdf_path = compile_pdf(str(tex_output), str(day_dir), console)
+        if pdf_path:
+            console.print(f"[bold green]Done![/bold green] PDF → {pdf_path}")
     else:
-        console.print("\n[bold]Step 7/7:[/bold] [dim]PDF compilation skipped[/dim]")
-
-    console.print("\n[bold green]Done![/bold green]")
+        console.print("\n[bold]Step 7/7:[/bold] [dim]PDF compilation skipped (--no-pdf)[/dim]")
+        console.print("\n[bold green]Done![/bold green]")

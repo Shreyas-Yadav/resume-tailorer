@@ -35,6 +35,8 @@ def match_projects(
             "name": p.name,
             "description": p.description,
             "tech": p.tech,
+            "key_features": p.key_features,
+            "languages": p.languages,
         }
         for p in registry_projects
     ]
