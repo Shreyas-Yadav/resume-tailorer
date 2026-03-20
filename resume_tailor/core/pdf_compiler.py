@@ -48,16 +48,20 @@ def compile_pdf(
             timeout=PDFLATEX_TIMEOUT,
         )
         if result.returncode != 0 and run == 1:
-            if console:
-                # Show last 20 lines of log for debugging
-                log_lines = result.stdout.split("\n")[-20:]
-                console.print("[red]pdflatex compilation failed:[/red]")
-                for line in log_lines:
-                    if line.strip():
-                        console.print(f"  [dim]{line}[/dim]")
-                log_file = pdf_dir / (tex_file.stem + ".log")
-                console.print(f"[yellow]Full log: {log_file}[/yellow]")
-            return None
+            pdf_path_check = pdf_dir / (tex_file.stem + ".pdf")
+            if not pdf_path_check.exists():
+                if console:
+                    # Show last 20 lines of log for debugging
+                    log_lines = result.stdout.split("\n")[-20:]
+                    console.print("[red]pdflatex compilation failed:[/red]")
+                    for line in log_lines:
+                        if line.strip():
+                            console.print(f"  [dim]{line}[/dim]")
+                    log_file = pdf_dir / (tex_file.stem + ".log")
+                    console.print(f"[yellow]Full log: {log_file}[/yellow]")
+                return None
+            elif console:
+                console.print("[yellow]pdflatex had warnings (PDF still produced)[/yellow]")
 
     # Always clean non-log auxiliary files
     pdf_name = tex_file.stem + ".pdf"
