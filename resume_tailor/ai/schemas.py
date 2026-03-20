@@ -47,3 +47,14 @@ class BulletPointsResponse(BaseModel):
     display_name: str
     tech_stack_display: str
     bullet_points: List[str]
+
+
+class LinkedInMessageResponse(BaseModel):
+    message: str = Field(description="Full LinkedIn connect message, plain text only, no markdown.")
+
+    @field_validator("message")
+    @classmethod
+    def strip_markdown(cls, v: str) -> str:
+        v = re.sub(r"\*\*(.+?)\*\*", r"\1", v)
+        v = re.sub(r"\*(.+?)\*", r"\1", v)
+        return v.strip()

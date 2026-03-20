@@ -6,6 +6,7 @@ from typing import List, Optional
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.rule import Rule
 
 from ..utils.config_manager import load_config
 
@@ -19,6 +20,10 @@ def tailor(
     model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model name"),
     output_dir: Optional[str] = typer.Option(None, "--output-dir", "-o", help="Output directory"),
     pdf: bool = typer.Option(True, "--pdf/--no-pdf", help="Compile PDF after editing LaTeX (default: on)"),
+    linkedin: bool = typer.Option(False, "--linkedin", help="Generate a LinkedIn recruiter connect message"),
+    recruiter: Optional[str] = typer.Option(None, "--recruiter", help="Recruiter's name for the LinkedIn message"),
+    graduation: Optional[str] = typer.Option(None, "--graduation", help="Graduation timeline, e.g. 'May 2025'"),
+    limit: int = typer.Option(300, "--limit", help="Max character limit for the LinkedIn message (default: 300)"),
 ):
     """Tailor your resume to a job posting using AI."""
     console = Console()
@@ -67,7 +72,7 @@ def tailor(
 
     # Wrap pipeline in try/except for clean error messages
     try:
-        _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, output_dir, pdf)
+        _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, output_dir, pdf, linkedin, recruiter, graduation, limit)
     except Exception as e:
         error_msg = str(e)
         if "RetryError" in type(e).__name__ and hasattr(e, "last_attempt"):
@@ -76,7 +81,7 @@ def tailor(
         raise typer.Exit(1)
 
 
-def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, output_dir, pdf):
+def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, output_dir, pdf, linkedin=False, recruiter=None, graduation=None, limit=300):
     """Run the 7-step tailoring pipeline."""
     # Step 1: Fetch job posting
     from ..core.job_fetcher import fetch_and_parse_job
@@ -150,3 +155,13 @@ def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, o
     else:
         console.print("\n[bold]Step 7/7:[/bold] [dim]PDF compilation skipped (--no-pdf)[/dim]")
         console.print("\n[bold green]Done![/bold green]")
+
+    if linkedin:
+        from ..core.linkedin_generator import generate_linkedin_message
+        console.print("\n[bold]LinkedIn:[/bold] Generating connect message...")
+        msg = generate_linkedin_message(job, tailored, match_result, llm, recruiter, graduation, console, limit)
+        if msg:
+            char_count = len(msg)
+            console.print(Rule(f"[green]LinkedIn Connect Message ({char_count}/{limit} chars)[/green]"))
+            console.print(msg)
+            console.print(Rule(style="green"))

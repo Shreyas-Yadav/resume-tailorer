@@ -97,6 +97,60 @@ Prioritize projects that:
 4. Are most impressive and differentiated"""
 
 
+def linkedin_message_prompt(
+    job_title: str,
+    company: str,
+    tech_stack: list,
+    top_project_name: str,
+    top_project_bullets: list,
+    professional_summary: str,
+    recruiter_name_or_placeholder: str = "[Recruiter Name]",
+    graduation_or_placeholder: str = "May 2026",
+    limit: int = 300,
+) -> str:
+    """Prompt to generate a conversational LinkedIn cold outreach message."""
+    tech_str = ", ".join(tech_stack)
+    bullets_str = "\n".join(f"- {b}" for b in top_project_bullets)
+    return f"""You are writing a cold outreach LinkedIn connection note from a CS student to someone at a company they want to work at.
+
+Context about the sender:
+- Graduating: {graduation_or_placeholder}
+- Background: {professional_summary}
+- Most relevant project: {top_project_name}
+- What they built / impact:
+{bullets_str}
+
+Context about the recipient:
+- Works at: {company}
+- Role the sender is applying to: {job_title}
+- Tech the team works with: {tech_str}
+
+Your goal:
+- Make the message feel personal and genuine, like it was written by a real person who did their research
+- Focus on 1 specific project and why it connects to what {company} does — don't list multiple projects or skills
+- If you mention tech, weave 1–2 names naturally into a sentence — never enumerate them like a list
+- Show real interest in {company} specifically, not just the job opening
+- End with a subtle dual ask: a quick chat or intro, and gently leave the door open for a referral (e.g. "if you think it could be a fit, I'd love to be considered or just hear your take")
+
+Avoid:
+- Generic openers like "I came across your opening" or "I noticed you're hiring"
+- Listing tech or skills like a resume (e.g. "AWS Lambda, SQS, and RDS MySQL" reads like a bullet point)
+- Sounding stiff, corporate, or robotic
+- Flattery that feels hollow
+
+Tone: warm, direct, conversational — like a smart student who knows what they're doing and respects the reader's time.
+
+Greeting: "Hi {recruiter_name_or_placeholder},"
+If the recruiter name is "[Recruiter Name]", keep that placeholder exactly as-is.
+
+CHARACTER LIMIT: {limit} characters total (including spaces). Use as much of this space as you need to sound complete and natural — don't cut off abruptly, but don't pad either.
+
+Plain text only — no markdown, no asterisks, no bullet points, no numbered lists.
+
+Return a JSON object with exactly one key:
+{{"message": "the full message text"}}"""
+
+
 def bullet_generation_prompt(project_name: str, project_description: str, project_tech: str, job_title: str, job_tech: str, suggested_angle: str, key_features=None) -> str:
     """Prompt to generate tailored bullet points for a selected project."""
     features_section = (
