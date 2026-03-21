@@ -84,7 +84,7 @@ Return a JSON object with these exact keys:
   - "reasoning": why this project is relevant (string)
   - "suggested_angle": how to frame this project for the role (string)
 - "professional_summary": a rewritten 2-3 sentence professional summary tailored to this role. Use **bold** for key technologies and skills. Must be compelling and specific to the job. (string)
-- "infrastructure_and_tools": a reordered comma-separated list of infrastructure, tools, frameworks, and platforms for the Technical Skills section. Put the most job-relevant ones first. You may add tools from the job posting that the candidate likely knows, but NEVER remove tools already listed. (string, no markdown formatting)
+- "infrastructure_and_tools": a curated comma-separated list of the most relevant infrastructure, tools, frameworks, and platforms for this specific job. Pick the 15–20 most relevant items from the existing list — prioritize tools mentioned in the job posting and drop niche or unrelated ones. You may add tools from the job posting that the candidate clearly knows. Keep it tight so the resume stays on one page. (string, no markdown formatting)
 
 CRITICAL RULES:
 - NEVER select two projects that are the same or overlapping. The "Existing Resume Projects" and "Discovered Projects" may contain different versions or subsets of the same project (e.g. a frontend and backend of the same app, or an existing project that was also discovered on disk). If an existing resume project and a discovered project refer to the same underlying work, pick only ONE of them — prefer the existing version since it already has polished content.
