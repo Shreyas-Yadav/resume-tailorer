@@ -28,6 +28,7 @@ def tailor(
     review: bool = typer.Option(True, "--review/--no-review", help="Run final quality review before writing output"),
     strict_truthfulness: bool = typer.Option(True, "--strict-truthfulness/--allow-approximations", help="Reject unsupported project metrics and claims"),
     fill_page: bool = typer.Option(True, "--fill-page/--no-fill-page", help="Use available page space for more high-signal content"),
+    enrich_workers: int = typer.Option(4, "--enrich-workers", min=1, max=8, help="Number of parallel workers for project enrichment"),
 ):
     """Tailor your resume to a job posting using AI."""
     console = Console()
@@ -94,6 +95,7 @@ def tailor(
             review,
             strict_truthfulness,
             fill_page,
+            enrich_workers,
         )
     except Exception as e:
         error_msg = str(e)
@@ -121,6 +123,7 @@ def _run_pipeline(
     review=True,
     strict_truthfulness=True,
     fill_page=True,
+    enrich_workers=4,
 ):
     """Run the 7-step tailoring pipeline."""
     # Step 1: Fetch job posting
@@ -146,7 +149,13 @@ def _run_pipeline(
     # Step 4: Enrich registry projects before matching
     from ..core.project_enricher import enrich_projects
     console.print("\n[bold]Step 4/7:[/bold] Enriching project evidence...")
-    enriched_projects = enrich_projects(job=job, registry=registry, llm=llm, console=console)
+    enriched_projects = enrich_projects(
+        job=job,
+        registry=registry,
+        llm=llm,
+        max_workers=enrich_workers,
+        console=console,
+    )
     console.print(f"  [green]Enriched {len(enriched_projects)} projects[/green]")
 
     # Step 5: Match and rank

@@ -1,6 +1,7 @@
 """Build enriched project profiles before matching."""
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Optional
 
@@ -45,6 +46,7 @@ def enrich_projects(
     registry: List[ProjectEntry],
     job: JobPosting,
     llm: LLMClient,
+    max_workers: int = 4,
     console: Optional[Console] = None,
 ) -> List[EnrichedProject]:
     """Enrich registry projects with evidence-grounded summaries before selection."""
@@ -72,8 +74,10 @@ def enrich_projects(
     if duplicate_count and console:
         console.print(f"[yellow]Warning: removed {duplicate_count} duplicate project registry entr(y/ies) before enrichment[/yellow]")
 
-    enriched: List[EnrichedProject] = []
-    for entry in deduped.values():
+    entries = list(deduped.values())
+    max_workers = max(1, min(max_workers, len(entries) or 1))
+
+    def _enrich_one(index: int, entry: ProjectEntry) -> tuple[int, EnrichedProject]:
         if console:
             console.print(f"  [dim]Enriching {entry.name}...[/dim]")
 
@@ -95,8 +99,7 @@ def enrich_projects(
         )
 
         data = llm.generate_structured(prompt, EnrichedProjectResponse, temperature=0.2)
-        enriched.append(
-            EnrichedProject(
+        return index, EnrichedProject(
                 name=data.name or entry.name,
                 path=entry.path,
                 description=data.description or entry.description,
@@ -109,6 +112,26 @@ def enrich_projects(
                 evidence_summary=data.evidence_summary,
                 requirement_tags=data.requirement_tags,
             )
-        )
+    
+    if max_workers == 1:
+        return [_enrich_one(index, entry)[1] for index, entry in enumerate(entries)]
 
-    return enriched
+    enriched_by_index: dict[int, EnrichedProject] = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_enrich_one, index, entry): (index, entry.name)
+            for index, entry in enumerate(entries)
+        }
+        for future in as_completed(futures):
+            index, name = futures[future]
+            try:
+                result_index, enriched_project = future.result()
+                enriched_by_index[result_index] = enriched_project
+                if console:
+                    console.print(f"  [green]✓[/green] [dim]Enriched {name}[/dim]")
+            except Exception:
+                if console:
+                    console.print(f"  [red]Failed enriching {name}[/red]")
+                raise
+
+    return [enriched_by_index[index] for index in range(len(entries))]
