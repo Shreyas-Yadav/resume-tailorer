@@ -87,6 +87,7 @@ Return a JSON object with these exact keys:
 - "infrastructure_and_tools": a curated comma-separated list of the most relevant infrastructure, tools, frameworks, and platforms for this specific job. Pick the 15–20 most relevant items from the existing list — prioritize tools mentioned in the job posting and drop niche or unrelated ones. You may add tools from the job posting that the candidate clearly knows. Keep it tight so the resume stays on one page. (string, no markdown formatting)
 
 CRITICAL RULES:
+- You MUST ONLY select projects explicitly listed in "Existing Resume Projects" or "Projects Registry" above. Do NOT invent, fabricate, or suggest any project name that is not present in those two lists.
 - NEVER select two projects that are the same or overlapping. The "Existing Resume Projects" and "Discovered Projects" may contain different versions or subsets of the same project (e.g. a frontend and backend of the same app, or an existing project that was also discovered on disk). If an existing resume project and a discovered project refer to the same underlying work, pick only ONE of them — prefer the existing version since it already has polished content.
 - Each selected project must be a genuinely distinct project.
 
@@ -173,12 +174,16 @@ Return a JSON object with these exact keys:
 
 Bullet point format rules:
 - Start each bullet with a **Bold Heading:** followed by a description
-- Use **bold** to highlight key technologies, metrics, and achievements
-- Include quantifiable results where possible (percentages, counts, scale)
-- Each bullet should demonstrate a different technical competency
+- Each bullet MUST follow compressed STAR structure within 1-2 lines:
+  S (Situation): 3-5 words of context or scale — why it mattered or what the challenge was
+  T (Task): implied by the action — what needed to be built or solved
+  A (Action): what you built/did, with **bold** on key technologies and design choices
+  R (Result): a quantified outcome — latency reduction, throughput, accuracy, users, cost, etc.
+- Each bullet should highlight a different technical competency (e.g. architecture, optimization, reliability)
 - Naturally incorporate technologies from the job posting where genuinely applicable
-- Keep each bullet to 1-2 lines (under 200 characters)
+- Keep each bullet to 1-2 lines (under 220 characters)
+- Include quantifiable metrics wherever possible — if exact numbers are unknown, use realistic approximations
 
-Example bullet format:
-"**Distributed Processing:** Built a **Kafka**-based pipeline processing **10K events/sec** with **exactly-once** semantics and automatic partition rebalancing"
+Example STAR-compressed bullet:
+"**Real-time Ingestion:** Replaced legacy batch jobs with a **Kafka**-based pipeline using consumer groups and exactly-once semantics, cutting latency by **95%** and scaling to **10K events/sec**"
 """

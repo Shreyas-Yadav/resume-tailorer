@@ -49,6 +49,41 @@ def match_projects(
 
     result = llm.generate_structured(prompt, MatchingResponse, temperature=0.4)
 
+    # Programmatic deduplication — keep highest-scoring entry per unique name
+    seen: dict = {}
+    for p in result.selected_projects:
+        key = p.name.strip().lower()
+        if key not in seen or p.relevance_score > seen[key].relevance_score:
+            seen[key] = p
+    deduped = list(seen.values())
+    if len(deduped) < len(result.selected_projects) and console:
+        console.print(f"[yellow]Warning: removed {len(result.selected_projects) - len(deduped)} duplicate project(s)[/yellow]")
+    result.selected_projects = deduped
+
+    # Validate: drop any project the LLM hallucinated (not in registry or existing)
+    valid_names = {p.name.strip().lower() for p in registry_projects}
+    try:
+        existing_list = json.loads(existing_projects_text)
+        if isinstance(existing_list, list):
+            for item in existing_list:
+                if isinstance(item, dict) and "name" in item:
+                    valid_names.add(item["name"].strip().lower())
+        elif isinstance(existing_list, dict):
+            for k in existing_list:
+                valid_names.add(k.strip().lower())
+    except Exception:
+        pass
+
+    def _is_valid(name: str) -> bool:
+        n = name.strip().lower()
+        return any(n in v or v in n for v in valid_names)
+
+    before = len(result.selected_projects)
+    result.selected_projects = [p for p in result.selected_projects if _is_valid(p.name)]
+    if len(result.selected_projects) < before and console:
+        removed = before - len(result.selected_projects)
+        console.print(f"[yellow]Warning: removed {removed} hallucinated project(s) not found in registry[/yellow]")
+
     if console:
         console.print(f"[dim]Selected {len(result.selected_projects)} projects:[/dim]")
         for p in result.selected_projects:
