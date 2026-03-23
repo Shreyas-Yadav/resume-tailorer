@@ -8,41 +8,19 @@ from ..ai.llm_client import LLMClient
 from ..utils.file_utils import short_project_display
 from ..ai.prompts import project_matching_prompt
 from ..ai.schemas import MatchingResponse
-from ..models.data_models import JobPosting, ProjectEntry
-
-
-def _dedupe_registry_projects(
-    registry_projects: List[ProjectEntry],
-    console: Optional[Console] = None,
-) -> List[ProjectEntry]:
-    """Keep the first registry entry for each normalized project name."""
-    deduped: dict[str, ProjectEntry] = {}
-    duplicate_count = 0
-
-    for project in registry_projects:
-        key = project.name.strip().lower()
-        if key in deduped:
-            duplicate_count += 1
-            continue
-        deduped[key] = project
-
-    if duplicate_count and console:
-        console.print(f"[yellow]Warning: removed {duplicate_count} duplicate project registry entr(y/ies) before matching[/yellow]")
-
-    return list(deduped.values())
+from ..models.data_models import EnrichedProject, JobPosting
 
 
 def match_projects(
     job: JobPosting,
-    registry_projects: List[ProjectEntry],
+    enriched_projects: List[EnrichedProject],
     llm: LLMClient,
+    max_projects: int = 4,
     console: Optional[Console] = None,
 ) -> MatchingResponse:
-    """Send job + registry projects to LLM, return structured matching results."""
+    """Send job + enriched projects to LLM, return structured matching results."""
     if console:
         console.print("[dim]Matching projects to job requirements...[/dim]")
-
-    registry_projects = _dedupe_registry_projects(registry_projects, console)
 
     job_dict = {
         "title": job.title,
@@ -60,13 +38,19 @@ def match_projects(
             "tech": p.tech,
             "key_features": p.key_features,
             "languages": p.languages,
+            "architecture_signals": p.architecture_signals,
+            "outcomes": p.outcomes,
+            "explicit_metrics": p.explicit_metrics,
+            "evidence_summary": p.evidence_summary,
+            "requirement_tags": p.requirement_tags,
         }
-        for p in registry_projects
+        for p in enriched_projects
     ]
 
     prompt = project_matching_prompt(
         json.dumps(job_dict, indent=2),
         json.dumps(projects_list, indent=2),
+        max_projects=max_projects,
     )
 
     result = llm.generate_structured(prompt, MatchingResponse, temperature=0.4)
@@ -83,7 +67,7 @@ def match_projects(
     result.selected_projects = deduped
 
     # Validate: drop any project the LLM hallucinated (not in registry)
-    valid_names = {p.name.strip().lower() for p in registry_projects}
+    valid_names = {p.name.strip().lower() for p in enriched_projects}
 
     def _is_valid(name: str) -> bool:
         n = name.strip().lower()

@@ -2,7 +2,7 @@
 
 import re
 from typing import List, Tuple
-from ..models.data_models import ExistingResume, ResumeSection
+from ..models.data_models import ExistingExperienceEntry, ExistingResume, ExistingSkills, ResumeSection
 
 
 # Sections we expect to find (in order)
@@ -145,3 +145,44 @@ def extract_existing_projects(resume: ExistingResume) -> List[dict]:
         })
 
     return projects
+
+
+def extract_existing_experience(resume: ExistingResume) -> List[ExistingExperienceEntry]:
+    """Extract role/company headers and bullet points from the Experience section."""
+    content = resume.experience.raw_content
+    pattern = re.compile(
+        r"(\\resumeSubheading\s*\n\s*\{(?P<role>.+?)\}\{.+?\}\s*\n\s*\{(?P<company>.+?)\}\{.+?\}\s*\n\s*\\resumeItemListStart)(?P<bullets>.*?)(\\resumeItemListEnd)",
+        re.DOTALL,
+    )
+
+    entries: List[ExistingExperienceEntry] = []
+    for match in pattern.finditer(content):
+        bullets = re.findall(r"\\resumeItem\{(.+?)\}", match.group("bullets"), re.DOTALL)
+        entries.append(
+            ExistingExperienceEntry(
+                company=match.group("company").strip(),
+                role=match.group("role").strip(),
+                header_tex=match.group(1),
+                bullets=[b.strip() for b in bullets],
+            )
+        )
+
+    return entries
+
+
+def extract_existing_skills(resume: ExistingResume) -> ExistingSkills:
+    """Extract skills values from the Technical Skills section."""
+    content = resume.skills.raw_content
+
+    def _extract(label: str) -> List[str]:
+        pattern = rf"\\textbf\{{{label}\}}\{{: (.+?)\}}"
+        match = re.search(pattern, content)
+        if not match:
+            return []
+        return [item.strip() for item in match.group(1).split(",") if item.strip()]
+
+    return ExistingSkills(
+        languages=_extract("Languages"),
+        infrastructure_and_tools=_extract(r"Infrastructure \\& Tools"),
+        coursework=_extract("Coursework"),
+    )

@@ -2,14 +2,17 @@
 
 import re
 from typing import List
-from ..models.data_models import ExistingResume, TailoredProject, TailoredResume
+from ..models.data_models import ExistingResume, TailoredExperienceEntry, TailoredProject, TailoredResume, TailoredSkills
 
 
 def _markdown_bold_to_latex(text: str) -> str:
     """Convert **bold** to \\textbf{bold} and escape special chars."""
-    # Escape & and % (but not backslashes we'll add)
+    # Escape common LaTeX special chars while preserving inserted commands.
+    text = text.replace("\\", r"\textbackslash ")
     text = text.replace("&", r"\&")
     text = text.replace("%", r"\%")
+    text = text.replace("_", r"\_")
+    text = text.replace("#", r"\#")
     # Convert **bold** to \textbf{bold}
     text = re.sub(r"\*\*(.+?)\*\*", r"\\textbf{\1}", text)
     return text
@@ -53,11 +56,46 @@ def _build_projects_section(projects: List[TailoredProject]) -> str:
     return "\n".join(lines)
 
 
-def _build_skills_section(skills: dict) -> str:
+def _build_experience_section(entries: List[TailoredExperienceEntry], fallback_raw: str) -> str:
+    """Build an updated Experience section while preserving subheading structure."""
+    if not entries:
+        return fallback_raw
+
+    pattern = re.compile(
+        r"(\\section\{Experience\}\s*\\resumeSubHeadingListStart)?(?P<body>.*?)(\\resumeSubHeadingListEnd)",
+        re.DOTALL,
+    )
+    body_match = pattern.search(fallback_raw)
+    if not body_match:
+        return fallback_raw
+
+    entry_pattern = re.compile(
+        r"(\\resumeSubheading\s*\n\s*\{(?P<role>.+?)\}\{.+?\}\s*\n\s*\{(?P<company>.+?)\}\{.+?\}\s*\n\s*\\resumeItemListStart)(?P<bullets>.*?)(\\resumeItemListEnd)",
+        re.DOTALL,
+    )
+    replacements = {(e.company.strip().lower(), e.role.strip().lower()): e for e in entries}
+
+    def _replace(match: re.Match) -> str:
+        key = (match.group("company").strip().lower(), match.group("role").strip().lower())
+        tailored = replacements.get(key)
+        if not tailored:
+            return match.group(0)
+
+        bullet_lines = []
+        for bullet in tailored.bullet_points:
+            bullet_lines.append(f"        \\resumeItem{{{_markdown_bold_to_latex(bullet)}}}")
+        bullets = "\n".join(bullet_lines)
+        return f"{match.group(1)}\n{bullets}\n        \\resumeItemListEnd"
+
+    new_body = entry_pattern.sub(_replace, body_match.group("body"))
+    return "\\section{Experience}\n  \\resumeSubHeadingListStart" + new_body + "\\resumeSubHeadingListEnd"
+
+
+def _build_skills_section(skills: TailoredSkills) -> str:
     """Build the Technical Skills LaTeX section."""
-    languages = skills.get("languages", "")
-    infra = skills.get("infrastructure_and_tools", "")
-    coursework = skills.get("coursework", "")
+    languages = ", ".join(skills.languages)
+    infra = ", ".join(skills.infrastructure_and_tools)
+    coursework = ", ".join(skills.coursework)
 
     return (
         f"\\section{{Technical Skills}}\n"
@@ -75,42 +113,19 @@ def edit_resume(
     resume: ExistingResume,
     tailored: TailoredResume,
 ) -> str:
-    """Splice tailored content into the resume, replacing only summary and projects.
-
-    Skills, experience, and education are left untouched.
-    Replaces in reverse document order (projects → summary) to avoid line-number shifts.
-    """
+    """Splice tailored content into the resume, replacing summary, experience, projects, and skills."""
     lines = list(resume.raw_lines)
 
-    # Replace Infrastructure & Tools line in skills section (in-place, no line count change)
-    if tailored.infrastructure_and_tools:
-        infra_pattern = re.compile(r"(\\textbf\{Infrastructure \\& Tools\}\{: ).+(\})")
-        for i in range(resume.skills.start_line, resume.skills.end_line):
-            if infra_pattern.search(lines[i]):
-                lines[i] = infra_pattern.sub(
-                    rf"\g<1>{tailored.infrastructure_and_tools}\2", lines[i]
-                )
-                break
+    replacements = [
+        (resume.skills, _build_skills_section(tailored.skills)),
+        (resume.projects, _build_projects_section(tailored.projects)),
+        (resume.experience, _build_experience_section(tailored.experience, resume.experience.raw_content)),
+        (resume.summary, _build_summary_section(tailored.professional_summary)),
+    ]
 
-    new_projects = _build_projects_section(tailored.projects)
-    new_summary = _build_summary_section(tailored.professional_summary)
-
-    # Replace projects first (comes later in the document)
-    projects_lines = new_projects.split("\n")
-    lines[resume.projects.start_line : resume.projects.end_line] = projects_lines
-
-    proj_delta = len(projects_lines) - (resume.projects.end_line - resume.projects.start_line)
-
-    # Replace summary. If summary comes after the projects block (unusual layout),
-    # adjust its line numbers by the delta introduced by the projects replacement.
-    # The shift boundary is projects.end_line — everything at or after that point moved.
-    sum_start = resume.summary.start_line
-    sum_end = resume.summary.end_line
-    if sum_start >= resume.projects.end_line:
-        sum_start += proj_delta
-        sum_end += proj_delta
-
-    summary_lines = new_summary.split("\n")
-    lines[sum_start:sum_end] = summary_lines
+    for section, replacement in sorted(replacements, key=lambda item: item[0].start_line, reverse=True):
+        if not section.raw_content:
+            continue
+        lines[section.start_line:section.end_line] = replacement.split("\n")
 
     return "\n".join(lines)

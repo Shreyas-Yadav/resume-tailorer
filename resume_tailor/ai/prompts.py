@@ -55,36 +55,81 @@ Return a JSON object with these exact keys:
 - "languages": list of programming languages used (list of strings)"""
 
 
-def project_matching_prompt(job_posting_json: str, projects_json: str) -> str:
-    """Prompt to rank and select registry projects for the tailored resume."""
-    return f"""You are a resume optimization expert. Given a job posting and a set of candidate projects (both from the existing resume and from a projects registry), select the TOP 3 projects that best align with the job requirements.
-
-Also rewrite the professional summary tailored to this role.
+def project_enrichment_prompt(project_json: str, deep_context: str, job_posting_json: str) -> str:
+    """Prompt to enrich a registry project with evidence grounded in source material."""
+    return f"""You are enriching a software project profile for targeted resume tailoring.
 
 Job Posting:
 ---
 {job_posting_json}
 ---
 
-Projects Registry (name, description, tech, key_features, languages):
+Registry Project:
+---
+{project_json}
+---
+
+Deep Context:
+---
+{deep_context}
+---
+
+Return a JSON object with these exact keys:
+- "name": project name
+- "description": 2-3 sentence evidence-grounded description
+- "tech": list of technologies clearly supported by the registry/deep context
+- "key_features": list of 3-5 supported technical features
+- "languages": list of languages clearly supported
+- "architecture_signals": list of supported architecture/system design signals
+- "outcomes": list of supported outcomes or impact statements; qualitative is fine
+- "explicit_metrics": list of explicit quantitative metrics found verbatim or near-verbatim in the source material
+- "evidence_summary": compact summary of why this project matters for the job
+- "requirement_tags": list of job-relevant requirement themes this project supports
+
+Rules:
+- Stay grounded in the provided evidence.
+- Do not invent metrics.
+- Only include technologies and outcomes supported by the provided material.
+- Requirement tags should be short phrases like "backend APIs", "cloud infrastructure", "distributed systems", "data pipelines", "security", "frontend UX", "testing", "databases"."""
+
+
+def project_matching_prompt(job_posting_json: str, projects_json: str, max_projects: int) -> str:
+    """Prompt to rank and select registry projects for the tailored resume."""
+    return f"""You are a resume optimization expert. Given a job posting and a set of enriched registry projects, select the smallest high-quality set of projects that covers the role's most important requirements.
+
+Also rewrite the professional summary tailored to this role.
+Also propose a tightly targeted skills section.
+
+Job Posting:
+---
+{job_posting_json}
+---
+
+Enriched Projects:
 ---
 {projects_json}
 ---
 
 Return a JSON object with these exact keys:
-- "selected_projects": list of exactly 3 objects, each with:
+- "selected_projects": list of 2 to {max_projects} objects, each with:
   - "name": project name (string)
-  - "source": "existing" or "discovered" (string)
   - "relevance_score": 0.0 to 1.0 (number)
   - "reasoning": why this project is relevant (string)
   - "suggested_angle": how to frame this project for the role (string)
+- "requirement_buckets": list of the 4-8 most important requirement themes for the job, each with:
+  - "name": short theme name (string)
+  - "evidence": short evidence snippets from the posting (list of strings)
 - "professional_summary": a rewritten 2-3 sentence professional summary tailored to this role. Use **bold** for key technologies and skills. Must be compelling and specific to the job. (string)
-- "infrastructure_and_tools": a curated comma-separated list of the most relevant infrastructure, tools, frameworks, and platforms for this specific job. Pick the 15–20 most relevant items from the existing list — prioritize tools mentioned in the job posting and drop niche or unrelated ones. You may add tools from the job posting that the candidate clearly knows. Keep it tight so the resume stays on one page. (string, no markdown formatting)
+- "languages": list of the most relevant languages to keep in the resume skills section
+- "infrastructure_and_tools": list of the most relevant infrastructure, tools, frameworks, and platforms for this role
+- "coursework": list of the most relevant coursework items to keep, if any
 
 CRITICAL RULES:
 - You MUST ONLY select projects explicitly listed in "Projects Registry" above. Do NOT invent, fabricate, or suggest any project name that is not present in that list.
+- Select 2 to {max_projects} projects, choosing the smallest set that still covers the most important requirement buckets well.
 - NEVER select two projects that are the same or overlapping. If multiple registry entries refer to the same underlying work, pick only one.
 - Each selected project must be a genuinely distinct project.
+- Optimize for requirement coverage across the set, not just per-project strength.
 
 Prioritize projects that:
 1. Directly use technologies mentioned in the job posting
@@ -177,8 +222,125 @@ Bullet point format rules:
 - Each bullet should highlight a different technical competency (e.g. architecture, optimization, reliability)
 - Naturally incorporate technologies from the job posting where genuinely applicable
 - Keep each bullet to 1-2 lines (under 220 characters)
-- Include quantifiable metrics wherever possible — if exact numbers are unknown, use realistic approximations
+- Include quantifiable metrics only when explicitly supported by the provided project description or key features
+- If no metric is supported, use a truthful qualitative outcome instead
+- Do not introduce technologies or outcomes not grounded in the provided project context
 
 Example STAR-compressed bullet:
 "**Real-time Ingestion:** Replaced legacy batch jobs with a **Kafka**-based pipeline using consumer groups and exactly-once semantics, cutting latency by **95%** and scaling to **10K events/sec**"
 """
+
+
+def experience_tailoring_prompt(job_posting_json: str, experience_json: str) -> str:
+    """Prompt to tailor existing experience bullets for the target role."""
+    return f"""Rewrite the resume experience bullets to better target the job while staying truthful to the original experience.
+
+Job Posting:
+---
+{job_posting_json}
+---
+
+Existing Experience:
+---
+{experience_json}
+---
+
+Return a JSON object with exactly one key:
+- "entries": list of objects, each with:
+  - "company": exact company name from the input
+  - "role": exact role name from the input
+  - "bullet_points": list of 2-3 rewritten bullets
+
+Rules:
+- Preserve company and role names exactly.
+- Keep bullets grounded in the original bullets; do not invent projects or metrics.
+- Reorder emphasis toward the target job's most important requirements.
+- Use the same compact resume style with **bold** for the key technical phrases.
+- Do not repeat the same competency across every bullet."""
+
+
+def additional_experience_bullet_prompt(job_posting_json: str, experience_entry_json: str) -> str:
+    """Prompt to add one more truthful, relevant experience bullet."""
+    return f"""Write one additional resume bullet for this experience entry to improve targeted-job relevance while staying truthful to the source material.
+
+Job Posting:
+---
+{job_posting_json}
+---
+
+Experience Entry:
+---
+{experience_entry_json}
+---
+
+Return a JSON object with exactly one key:
+- "bullet_point": one additional bullet
+
+Rules:
+- Keep the bullet grounded in the provided source bullets.
+- Do not invent metrics, projects, or technologies.
+- Add a different competency from the existing tailored bullets.
+- Use compact resume style with **bold** emphasis on the key technical phrase."""
+
+
+def skills_tailoring_prompt(job_posting_json: str, skills_json: str, available_project_skills: str) -> str:
+    """Prompt to tailor the technical skills section."""
+    return f"""Curate a one-page resume skills section for the target role.
+
+Job Posting:
+---
+{job_posting_json}
+---
+
+Existing Skills:
+---
+{skills_json}
+---
+
+Skills supported by selected projects:
+---
+{available_project_skills}
+---
+
+Return a JSON object with these exact keys:
+- "languages": ordered list of languages to keep
+- "infrastructure_and_tools": ordered list of infrastructure/tools/frameworks/platforms to keep
+- "coursework": ordered list of coursework items to keep
+
+Rules:
+- Keep the section compact and ATS-friendly.
+- Prioritize job-relevant items and items supported by the resume/projects.
+- Remove weak, repetitive, or irrelevant tools.
+- Do not add unsupported skills."""
+
+
+def resume_review_prompt(job_posting_json: str, resume_json: str) -> str:
+    """Prompt to review the final tailored resume draft."""
+    return f"""Review this tailored resume draft for quality against the target job posting.
+
+Job Posting:
+---
+{job_posting_json}
+---
+
+Tailored Resume Draft:
+---
+{resume_json}
+---
+
+Return a JSON object with these exact keys:
+- "passed": boolean
+- "underfilled": boolean indicating whether the resume likely leaves too much empty space on a one-page layout
+- "missing_requirements": list of important job requirement themes not covered well
+- "duplicated_themes": list of themes repeated too much across summary/experience/projects
+- "unsupported_claims": list of suspicious claims, metrics, or technologies that may not be grounded
+- "trim_suggestions": list of content that should be shortened or removed to improve one-page quality
+- "page_fill_recommendations": list of specific suggestions to use empty space with higher-signal content
+- "issues": list of objects with:
+  - "severity": one of "high", "medium", "low"
+  - "message": concise issue description
+
+Rules:
+- Focus on relevance, coverage, unsupported claims, and repetition.
+- Mark underfilled=true when the draft appears noticeably short for a one-page resume and there is room for more high-signal content.
+- Mark passed=true only if the resume is strong for the target role without obvious unsupported claims or major gaps."""
