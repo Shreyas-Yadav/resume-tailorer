@@ -30,6 +30,23 @@ def save_json(
         raise
 
 
+def short_project_display(name: str, description: str = "") -> str:
+    """Format a project name as 'ShortName (brief description)'.
+
+    If the name contains ' - ', splits on it:
+        'Threat Radar - Container Security Scanner' → 'Threat Radar (Container Security Scanner)'
+    Otherwise uses the first 4 words of description:
+        'ClipStudy', 'AI-powered video learning platform...' → 'ClipStudy (AI-powered video learning)'
+    """
+    if " - " in name:
+        short, desc = name.split(" - ", 1)
+        return f"{short} ({desc})"
+    if description:
+        words = description.split()[:4]
+        return f"{name} ({' '.join(words)})"
+    return name
+
+
 def save_text(
     content: str,
     filepath: str,

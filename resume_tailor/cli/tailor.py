@@ -1,6 +1,5 @@
 """Main tailor command — full resume tailoring pipeline."""
 
-import json
 from pathlib import Path
 from typing import List, Optional
 import typer
@@ -90,11 +89,10 @@ def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, o
     console.print(f"  [green]Got: {job.title} at {job.company}[/green]")
 
     # Step 2: Parse resume
-    from ..core.latex_parser import parse_resume, extract_existing_projects
+    from ..core.latex_parser import parse_resume
     console.print("\n[bold]Step 2/7:[/bold] Parsing resume...")
     parsed_resume = parse_resume(str(resume_path))
-    existing_projects = extract_existing_projects(parsed_resume)
-    console.print(f"  [green]Found {len(existing_projects)} existing projects[/green]")
+    console.print("  [green]Resume sections parsed[/green]")
 
     # Step 3: Load project registry (no LLM needed — instant)
     from ..core.project_registry import parse_projects_md
@@ -105,13 +103,12 @@ def _run_pipeline(console, llm, job_url, job_file, resume_path, projects_path, o
     # Step 4: Match and rank (lightweight — just names/descriptions/tech)
     from ..core.project_matcher import match_projects
     console.print("\n[bold]Step 4/7:[/bold] Matching projects...")
-    existing_text = json.dumps(existing_projects, indent=2)
-    match_result = match_projects(job, registry, existing_text, llm, console)
+    match_result = match_projects(job, registry, llm, console)
 
     # Step 5: Deep-scan selected projects + generate bullets
     from ..core.content_generator import generate_bullets
     console.print("\n[bold]Step 5/7:[/bold] Deep-scanning selected projects & generating content...")
-    tailored_projects = generate_bullets(match_result.selected_projects, job, registry, existing_projects, llm, console)
+    tailored_projects = generate_bullets(match_result.selected_projects, job, registry, [], llm, console)
 
     # Build TailoredResume
     from ..models.data_models import TailoredResume

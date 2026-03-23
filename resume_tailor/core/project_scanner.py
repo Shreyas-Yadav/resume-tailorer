@@ -260,6 +260,7 @@ def profile_projects(
     console: Optional[Console] = None,
 ) -> List[ProjectProfile]:
     """Profile a list of project roots with LLM."""
+    from ..utils.file_utils import short_project_display
     profiles = []
     for root in roots:
         if console:
@@ -267,6 +268,8 @@ def profile_projects(
         try:
             profile = profile_project(root, llm)
             profiles.append(profile)
+            if console:
+                console.print(f"  [green]✓[/green] [dim]{short_project_display(profile.name, profile.description)}[/dim]")
         except KeyboardInterrupt:
             raise
         except Exception as e:

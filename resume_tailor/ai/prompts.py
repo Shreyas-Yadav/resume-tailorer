@@ -55,8 +55,8 @@ Return a JSON object with these exact keys:
 - "languages": list of programming languages used (list of strings)"""
 
 
-def project_matching_prompt(job_posting_json: str, projects_json: str, existing_resume_projects: str) -> str:
-    """Prompt to rank and select projects for the tailored resume."""
+def project_matching_prompt(job_posting_json: str, projects_json: str) -> str:
+    """Prompt to rank and select registry projects for the tailored resume."""
     return f"""You are a resume optimization expert. Given a job posting and a set of candidate projects (both from the existing resume and from a projects registry), select the TOP 3 projects that best align with the job requirements.
 
 Also rewrite the professional summary tailored to this role.
@@ -64,11 +64,6 @@ Also rewrite the professional summary tailored to this role.
 Job Posting:
 ---
 {job_posting_json}
----
-
-Existing Resume Projects:
----
-{existing_resume_projects}
 ---
 
 Projects Registry (name, description, tech, key_features, languages):
@@ -87,8 +82,8 @@ Return a JSON object with these exact keys:
 - "infrastructure_and_tools": a curated comma-separated list of the most relevant infrastructure, tools, frameworks, and platforms for this specific job. Pick the 15–20 most relevant items from the existing list — prioritize tools mentioned in the job posting and drop niche or unrelated ones. You may add tools from the job posting that the candidate clearly knows. Keep it tight so the resume stays on one page. (string, no markdown formatting)
 
 CRITICAL RULES:
-- You MUST ONLY select projects explicitly listed in "Existing Resume Projects" or "Projects Registry" above. Do NOT invent, fabricate, or suggest any project name that is not present in those two lists.
-- NEVER select two projects that are the same or overlapping. The "Existing Resume Projects" and "Discovered Projects" may contain different versions or subsets of the same project (e.g. a frontend and backend of the same app, or an existing project that was also discovered on disk). If an existing resume project and a discovered project refer to the same underlying work, pick only ONE of them — prefer the existing version since it already has polished content.
+- You MUST ONLY select projects explicitly listed in "Projects Registry" above. Do NOT invent, fabricate, or suggest any project name that is not present in that list.
+- NEVER select two projects that are the same or overlapping. If multiple registry entries refer to the same underlying work, pick only one.
 - Each selected project must be a genuinely distinct project.
 
 Prioritize projects that:

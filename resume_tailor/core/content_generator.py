@@ -8,6 +8,7 @@ from ..ai.llm_client import LLMClient
 from ..ai.prompts import bullet_generation_prompt
 from ..ai.schemas import BulletPointsResponse, SelectedProject
 from ..models.data_models import JobPosting, ProjectEntry, TailoredProject
+from ..utils.file_utils import short_project_display
 from ..core.project_scanner import _read_readme, _read_all_source_files, _read_dependency_files, _build_dir_tree
 
 
@@ -114,7 +115,7 @@ def generate_bullets(
         angle = proj_info.suggested_angle
 
         if console:
-            console.print(f"  [dim]Writing bullets for {name}...[/dim]")
+            console.print(f"  [dim]Writing bullets for {short_project_display(name)}...[/dim]")
 
         desc, tech, key_features = _get_project_context(name, registry, existing_projects, console)
 

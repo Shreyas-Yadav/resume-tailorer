@@ -5,21 +5,44 @@ from typing import List, Optional
 from rich.console import Console
 
 from ..ai.llm_client import LLMClient
+from ..utils.file_utils import short_project_display
 from ..ai.prompts import project_matching_prompt
 from ..ai.schemas import MatchingResponse
 from ..models.data_models import JobPosting, ProjectEntry
 
 
+def _dedupe_registry_projects(
+    registry_projects: List[ProjectEntry],
+    console: Optional[Console] = None,
+) -> List[ProjectEntry]:
+    """Keep the first registry entry for each normalized project name."""
+    deduped: dict[str, ProjectEntry] = {}
+    duplicate_count = 0
+
+    for project in registry_projects:
+        key = project.name.strip().lower()
+        if key in deduped:
+            duplicate_count += 1
+            continue
+        deduped[key] = project
+
+    if duplicate_count and console:
+        console.print(f"[yellow]Warning: removed {duplicate_count} duplicate project registry entr(y/ies) before matching[/yellow]")
+
+    return list(deduped.values())
+
+
 def match_projects(
     job: JobPosting,
     registry_projects: List[ProjectEntry],
-    existing_projects_text: str,
     llm: LLMClient,
     console: Optional[Console] = None,
 ) -> MatchingResponse:
-    """Send job + projects to LLM, return structured matching results."""
+    """Send job + registry projects to LLM, return structured matching results."""
     if console:
         console.print("[dim]Matching projects to job requirements...[/dim]")
+
+    registry_projects = _dedupe_registry_projects(registry_projects, console)
 
     job_dict = {
         "title": job.title,
@@ -44,7 +67,6 @@ def match_projects(
     prompt = project_matching_prompt(
         json.dumps(job_dict, indent=2),
         json.dumps(projects_list, indent=2),
-        existing_projects_text,
     )
 
     result = llm.generate_structured(prompt, MatchingResponse, temperature=0.4)
@@ -60,19 +82,8 @@ def match_projects(
         console.print(f"[yellow]Warning: removed {len(result.selected_projects) - len(deduped)} duplicate project(s)[/yellow]")
     result.selected_projects = deduped
 
-    # Validate: drop any project the LLM hallucinated (not in registry or existing)
+    # Validate: drop any project the LLM hallucinated (not in registry)
     valid_names = {p.name.strip().lower() for p in registry_projects}
-    try:
-        existing_list = json.loads(existing_projects_text)
-        if isinstance(existing_list, list):
-            for item in existing_list:
-                if isinstance(item, dict) and "name" in item:
-                    valid_names.add(item["name"].strip().lower())
-        elif isinstance(existing_list, dict):
-            for k in existing_list:
-                valid_names.add(k.strip().lower())
-    except Exception:
-        pass
 
     def _is_valid(name: str) -> bool:
         n = name.strip().lower()
@@ -87,6 +98,6 @@ def match_projects(
     if console:
         console.print(f"[dim]Selected {len(result.selected_projects)} projects:[/dim]")
         for p in result.selected_projects:
-            console.print(f"  [dim]- {p.name} (score: {p.relevance_score:.2f})[/dim]")
+            console.print(f"  [dim]- {short_project_display(p.name)} (score: {p.relevance_score:.2f})[/dim]")
 
     return result
