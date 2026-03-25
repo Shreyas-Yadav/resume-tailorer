@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Optional
+import re
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -29,6 +30,7 @@ def tailor(
     strict_truthfulness: bool = typer.Option(True, "--strict-truthfulness/--allow-approximations", help="Reject unsupported project metrics and claims"),
     fill_page: bool = typer.Option(True, "--fill-page/--no-fill-page", help="Use available page space for more high-signal content"),
     enrich_workers: int = typer.Option(4, "--enrich-workers", min=1, max=8, help="Number of parallel workers for project enrichment"),
+    bullet_workers: int = typer.Option(2, "--bullet-workers", min=1, max=6, help="Number of parallel workers for project bullet generation"),
 ):
     """Tailor your resume to a job posting using AI."""
     console = Console()
@@ -96,6 +98,7 @@ def tailor(
             strict_truthfulness,
             fill_page,
             enrich_workers,
+            bullet_workers,
         )
     except Exception as e:
         error_msg = str(e)
@@ -124,8 +127,23 @@ def _run_pipeline(
     strict_truthfulness=True,
     fill_page=True,
     enrich_workers=4,
+    bullet_workers=2,
 ):
     """Run the 7-step tailoring pipeline."""
+    def _merge_preserving_order(primary: list[str], secondary: list[str]) -> list[str]:
+        merged: list[str] = []
+        seen: set[str] = set()
+        for item in primary + secondary:
+            normalized = item.strip()
+            if not normalized:
+                continue
+            key = normalized.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(normalized)
+        return merged
+
     # Step 1: Fetch job posting
     from ..core.job_fetcher import fetch_and_parse_job
     console.print("\n[bold]Step 1/7:[/bold] Fetching job posting...")
@@ -165,13 +183,47 @@ def _run_pipeline(
 
     # Step 6: Generate projects, experience, and skills
     from ..core.content_generator import generate_bullets
-    from ..core.experience_generator import add_experience_bullet, tailor_experience as rewrite_experience
+    from ..core.experience_generator import (
+        add_experience_bullet,
+        repair_experience_framing,
+        rewrite_summary,
+        tailor_experience as rewrite_experience,
+    )
     from ..core.reviewer import review_resume, validate_project_bullets
     from ..core.skills_generator import tailor_skills
     from ..models.data_models import ResumeReview, TailoredResume
     from ..ai.schemas import SelectedProject
     console.print("\n[bold]Step 6/7:[/bold] Generating targeted content...")
-    tailored_project_data = generate_bullets(match_result.selected_projects, job, enriched_projects, llm, console)
+    requirement_themes = [bucket.name for bucket in match_result.requirement_buckets]
+
+    def _extract_resume_themes() -> list[str]:
+        themes = []
+        for entry in existing_experience:
+            for bullet in entry.bullets:
+                bold_terms = re.findall(r"\\textbf\{(.+?)\}", bullet)
+                themes.extend(bold_terms)
+        themes.extend(existing_skills.infrastructure_and_tools[:8])
+        deduped = []
+        seen = set()
+        for theme in themes:
+            normalized = theme.strip().lower()
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                deduped.append(theme)
+        return deduped[:12]
+
+    existing_resume_themes = _extract_resume_themes()
+
+    tailored_project_data = generate_bullets(
+        match_result.selected_projects,
+        job,
+        enriched_projects,
+        requirement_themes,
+        llm,
+        existing_resume_themes=existing_resume_themes,
+        max_workers=bullet_workers,
+        console=console,
+    )
 
     tailored_projects = []
     unsupported_claims = []
@@ -206,6 +258,7 @@ def _run_pipeline(
     for project in tailored_projects:
         inventory.extend([item.strip() for item in project.tech_stack_display.split(",") if item.strip()])
     tailored_skills = tailor_skills(job, existing_skills, inventory, llm, console)
+    tailored_skills.coursework = _merge_preserving_order(tailored_skills.coursework, existing_skills.coursework)
 
     tailored = TailoredResume(
         professional_summary=match_result.professional_summary,
@@ -222,6 +275,91 @@ def _run_pipeline(
         review_result.passed = review_result.passed and not review_result.unsupported_claims
         tailored.review = review_result
 
+        if tailored.review.generic_summary:
+            tailored.professional_summary = rewrite_summary(
+                job=job,
+                projects=[
+                    {
+                        "name": project.name,
+                        "tech_stack_display": project.tech_stack_display,
+                        "bullet_points": project.bullet_points,
+                        "repo_url": project.repo_url,
+                        "demo_url": project.demo_url,
+                    }
+                    for project in tailored.projects
+                ],
+                experience=tailored.experience,
+                current_summary=tailored.professional_summary,
+                llm=llm,
+                console=console,
+            )
+            review_result = review_resume(job, tailored, llm, console)
+            review_result.unsupported_claims = list(dict.fromkeys(review_result.unsupported_claims + unsupported_claims))
+            review_result.passed = review_result.passed and not review_result.unsupported_claims
+            tailored.review = review_result
+
+        if tailored.review.weak_experience_framing:
+            tailored.experience = repair_experience_framing(job, tailored.experience, llm, console)
+            review_result = review_resume(job, tailored, llm, console)
+            review_result.unsupported_claims = list(dict.fromkeys(review_result.unsupported_claims + unsupported_claims))
+            review_result.passed = review_result.passed and not review_result.unsupported_claims
+            tailored.review = review_result
+
+        def _remaining_projects_ranked():
+            remaining_projects = [
+                project for project in enriched_projects if project.name.strip().lower() not in selected_source_names
+            ]
+            missing = {req.lower() for req in tailored.review.missing_requirements}
+
+            def _project_score(project):
+                req_overlap = sum(1 for tag in project.requirement_tags if tag.strip().lower() in missing)
+                tech_overlap = sum(1 for tech in project.tech if tech in job.tech_stack)
+                strength = len(project.explicit_metrics) + len(project.architecture_signals) + len(project.key_features)
+                return (req_overlap, tech_overlap, strength)
+
+            return sorted(remaining_projects, key=_project_score, reverse=True)
+
+        def _append_project(next_project) -> bool:
+            extra_project_data = generate_bullets(
+                [
+                    SelectedProject(
+                        name=next_project.name,
+                        relevance_score=0.75,
+                        reasoning="Added to improve page fill and requirement coverage.",
+                        suggested_angle=next_project.evidence_summary or "Highlight the most relevant technical depth.",
+                    )
+                ],
+                job,
+                enriched_projects,
+                        requirement_themes,
+                        llm,
+                        existing_resume_themes=existing_resume_themes,
+                        max_workers=bullet_workers,
+                        console=console,
+                    )
+            if not extra_project_data:
+                return False
+
+            extra_project, explicit_metrics, source_name = extra_project_data[0]
+            issues = validate_project_bullets(
+                extra_project.bullet_points,
+                supported_terms=(
+                    next_project.tech
+                    + next_project.languages
+                    + next_project.key_features
+                    + next_project.architecture_signals
+                    + next_project.requirement_tags
+                ),
+                explicit_metrics=explicit_metrics,
+                strict_truthfulness=strict_truthfulness,
+            )
+            if issues:
+                return False
+
+            tailored.projects.append(extra_project)
+            selected_source_names.add(source_name.strip().lower())
+            return True
+
         def _try_fill_page() -> bool:
             if not fill_page or not tailored.review.underfilled:
                 return False
@@ -229,6 +367,11 @@ def _run_pipeline(
             experience_lookup = {
                 (entry.company.strip().lower(), entry.role.strip().lower()): entry for entry in existing_experience
             }
+
+            if len(tailored.projects) < max_projects:
+                for next_project in _remaining_projects_ranked():
+                    if _append_project(next_project):
+                        return True
 
             for idx, entry in enumerate(tailored.experience):
                 key = (entry.company.strip().lower(), entry.role.strip().lower())
@@ -239,52 +382,6 @@ def _run_pipeline(
                 if extra_bullet and extra_bullet not in entry.bullet_points:
                     tailored.experience[idx].bullet_points.append(extra_bullet)
                     return True
-
-            if len(tailored.projects) < max_projects:
-                remaining_projects = [
-                    project for project in enriched_projects if project.name.strip().lower() not in selected_source_names
-                ]
-                if remaining_projects:
-                    missing = {req.lower() for req in tailored.review.missing_requirements}
-
-                    def _project_score(project):
-                        req_overlap = sum(1 for tag in project.requirement_tags if tag.strip().lower() in missing)
-                        tech_overlap = sum(1 for tech in project.tech if tech in job.tech_stack)
-                        return (req_overlap, tech_overlap, len(project.explicit_metrics), len(project.architecture_signals))
-
-                    next_project = sorted(remaining_projects, key=_project_score, reverse=True)[0]
-                    extra_project_data = generate_bullets(
-                        [
-                            SelectedProject(
-                                name=next_project.name,
-                                relevance_score=0.75,
-                                reasoning="Added to improve page fill and requirement coverage.",
-                                suggested_angle=next_project.evidence_summary or "Highlight the most relevant technical depth.",
-                            )
-                        ],
-                        job,
-                        enriched_projects,
-                        llm,
-                        console,
-                    )
-                    if extra_project_data:
-                        extra_project, explicit_metrics, source_name = extra_project_data[0]
-                        issues = validate_project_bullets(
-                            extra_project.bullet_points,
-                            supported_terms=(
-                                next_project.tech
-                                + next_project.languages
-                                + next_project.key_features
-                                + next_project.architecture_signals
-                                + next_project.requirement_tags
-                            ),
-                            explicit_metrics=explicit_metrics,
-                            strict_truthfulness=strict_truthfulness,
-                        )
-                        if not issues:
-                            tailored.projects.append(extra_project)
-                            selected_source_names.add(source_name.strip().lower())
-                            return True
 
             project_skill_tokens = {item.strip() for item in inventory if item.strip()}
             for skill in existing_skills.infrastructure_and_tools:
@@ -301,7 +398,7 @@ def _run_pipeline(
 
             return False
 
-        for _ in range(2):
+        for _ in range(max(2, max_projects)):
             if not (fill_page and tailored.review.underfilled):
                 break
             console.print("[dim]Resume is underfilled; adding more high-signal content...[/dim]")

@@ -15,9 +15,11 @@ app = typer.Typer(
 from .tailor import tailor  # noqa: E402
 from .scan import scan  # noqa: E402
 from .profile import profile  # noqa: E402
+from .remotes import remotes  # noqa: E402
 from .config import config_app  # noqa: E402
 
 app.command()(tailor)
 app.command()(scan)
 app.command()(profile)
+app.command()(remotes)
 app.add_typer(config_app, name="config", help="Manage configuration.")

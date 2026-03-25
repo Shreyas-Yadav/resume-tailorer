@@ -24,6 +24,9 @@ class ProjectEntry:
     tech: List[str]
     key_features: List[str] = field(default_factory=list)
     languages: List[str] = field(default_factory=list)
+    repo_url: str = ""
+    demo_url: str = ""
+    impact_signals: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -45,6 +48,11 @@ class EnrichedProject:
     explicit_metrics: List[str] = field(default_factory=list)
     evidence_summary: str = ""
     requirement_tags: List[str] = field(default_factory=list)
+    workflow_signals: List[str] = field(default_factory=list)
+    automation_signals: List[str] = field(default_factory=list)
+    result_signals: List[str] = field(default_factory=list)
+    repo_url: str = ""
+    demo_url: str = ""
 
 
 @dataclass
@@ -70,6 +78,8 @@ class TailoredProject:
     name: str
     tech_stack_display: str
     bullet_points: List[str]
+    repo_url: str = ""
+    demo_url: str = ""
 
 
 @dataclass
@@ -96,11 +106,15 @@ class ReviewIssue:
 class ResumeReview:
     passed: bool
     underfilled: bool = False
+    generic_summary: bool = False
+    shallow_ai_positioning: bool = False
+    weak_experience_framing: bool = False
     missing_requirements: List[str] = field(default_factory=list)
     duplicated_themes: List[str] = field(default_factory=list)
     unsupported_claims: List[str] = field(default_factory=list)
     trim_suggestions: List[str] = field(default_factory=list)
     page_fill_recommendations: List[str] = field(default_factory=list)
+    credibility_gaps: List[str] = field(default_factory=list)
     issues: List[ReviewIssue] = field(default_factory=list)
 
 

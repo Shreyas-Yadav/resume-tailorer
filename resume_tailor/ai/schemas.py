@@ -38,6 +38,9 @@ class EnrichedProjectResponse(BaseModel):
     explicit_metrics: List[str]
     evidence_summary: str
     requirement_tags: List[str]
+    workflow_signals: List[str] = Field(default_factory=list)
+    automation_signals: List[str] = Field(default_factory=list)
+    result_signals: List[str] = Field(default_factory=list)
 
 
 class SelectedProject(BaseModel):
@@ -69,6 +72,37 @@ class BulletPointsResponse(BaseModel):
     bullet_points: List[str]
 
 
+class BulletPlanItemResponse(BaseModel):
+    competency: str
+    requirement_theme: str
+    evidence: List[str]
+    target_outcome: str
+
+
+class BulletPlanResponse(BaseModel):
+    display_name: str
+    tech_stack_display: str
+    bullet_plan: List[BulletPlanItemResponse]
+
+
+class BulletScoreItemResponse(BaseModel):
+    bullet_index: int
+    passes: bool
+    scores: List[int]
+    issues: List[str]
+    repair_instruction: str
+
+
+class BulletScoreResponse(BaseModel):
+    overall_passes: bool
+    duplicated_themes: List[str] = Field(default_factory=list)
+    scored_bullets: List[BulletScoreItemResponse]
+
+
+class BulletRepairResponse(BaseModel):
+    bullet_point: str
+
+
 class ExperienceEntryResponse(BaseModel):
     company: str
     role: str
@@ -93,16 +127,34 @@ class ReviewIssueResponse(BaseModel):
 class ResumeReviewResponse(BaseModel):
     passed: bool
     underfilled: bool = False
+    generic_summary: bool = False
+    shallow_ai_positioning: bool = False
+    weak_experience_framing: bool = False
     missing_requirements: List[str] = Field(default_factory=list)
     duplicated_themes: List[str] = Field(default_factory=list)
     unsupported_claims: List[str] = Field(default_factory=list)
     trim_suggestions: List[str] = Field(default_factory=list)
     page_fill_recommendations: List[str] = Field(default_factory=list)
+    credibility_gaps: List[str] = Field(default_factory=list)
     issues: List[ReviewIssueResponse] = Field(default_factory=list)
 
 
 class AdditionalBulletResponse(BaseModel):
     bullet_point: str
+
+
+class SummaryRewriteResponse(BaseModel):
+    professional_summary: str
+
+
+class ExperienceRepairEntryResponse(BaseModel):
+    company: str
+    role: str
+    bullet_points: List[str]
+
+
+class ExperienceRepairResponse(BaseModel):
+    entries: List[ExperienceRepairEntryResponse]
 
 
 class LinkedInMessageResponse(BaseModel):

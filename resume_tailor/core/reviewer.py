@@ -27,6 +27,26 @@ _GENERIC_BOLD_TERMS = {
 }
 
 _UNDERFILL_LINE_THRESHOLD = 43
+_GENERIC_SUMMARY_PHRASES = {
+    "passionate",
+    "enthusiastic",
+    "eager to contribute",
+    "team player",
+    "highly motivated",
+    "passion for",
+}
+_AI_DEPTH_TERMS = {
+    "workflow",
+    "orchestration",
+    "tool calling",
+    "tool-call",
+    "retrieval",
+    "background jobs",
+    "queue",
+    "pipeline",
+    "automation",
+    "agent",
+}
 
 
 def validate_project_bullets(
@@ -114,6 +134,50 @@ def recommend_page_fill_actions(tailored: TailoredResume) -> List[str]:
     return recommendations
 
 
+def _has_generic_summary(summary: str) -> bool:
+    lowered = summary.lower()
+    return any(phrase in lowered for phrase in _GENERIC_SUMMARY_PHRASES)
+
+
+def _has_shallow_ai_positioning(job: JobPosting, tailored: TailoredResume) -> bool:
+    job_text = " ".join(job.responsibilities + job.required_qualifications + job.preferred_qualifications + job.tech_stack).lower()
+    if not any(term in job_text for term in {"agent", "llm", "workflow", "automation", "ai"}):
+        return False
+
+    resume_text = " ".join(
+        [tailored.professional_summary]
+        + [bullet for project in tailored.projects for bullet in project.bullet_points]
+    ).lower()
+    mentions_ai = any(term in resume_text for term in {"llm", "openai", "langchain", "hugging face", "agent", "ai"})
+    has_depth = any(term in resume_text for term in _AI_DEPTH_TERMS)
+    return mentions_ai and not has_depth
+
+
+def _has_weak_experience_framing(job: JobPosting, tailored: TailoredResume) -> bool:
+    job_text = " ".join(job.responsibilities + job.required_qualifications + job.preferred_qualifications).lower()
+    if not tailored.experience:
+        return True
+    experience_text = " ".join(
+        [entry.role for entry in tailored.experience] + [bullet for entry in tailored.experience for bullet in entry.bullet_points]
+    ).lower()
+    technical_markers = {"api", "system", "debug", "linux", "backend", "automation", "testing", "service", "database"}
+    if not any(marker in experience_text for marker in technical_markers):
+        return True
+    if "software engineer" in job_text and "teaching assistant" in experience_text and "debug" not in experience_text:
+        return True
+    return False
+
+
+def _credibility_gaps(tailored: TailoredResume) -> List[str]:
+    gaps: List[str] = []
+    if tailored.projects and not any(project.repo_url or project.demo_url for project in tailored.projects):
+        gaps.append("Selected projects do not include repo or demo links for credibility.")
+    if any(("microservice" in bullet.lower() or "distributed" in bullet.lower() or "ai" in bullet.lower()) and not (project.repo_url or project.demo_url)
+           for project in tailored.projects for bullet in project.bullet_points):
+        gaps.append("High-signal architecture or AI claims would be more credible with repo/demo links.")
+    return gaps
+
+
 def review_resume(
     job: JobPosting,
     tailored: TailoredResume,
@@ -144,6 +208,8 @@ def review_resume(
                         "name": project.name,
                         "tech_stack_display": project.tech_stack_display,
                         "bullet_points": project.bullet_points,
+                        "repo_url": project.repo_url,
+                        "demo_url": project.demo_url,
                     }
                     for project in tailored.projects
                 ],
@@ -168,13 +234,21 @@ def review_resume(
     estimated_lines = estimate_resume_lines(tailored)
     heuristic_underfilled = estimated_lines < _UNDERFILL_LINE_THRESHOLD
     page_fill_recommendations = list(dict.fromkeys(response.page_fill_recommendations + recommend_page_fill_actions(tailored)))
+    generic_summary = response.generic_summary or _has_generic_summary(tailored.professional_summary)
+    shallow_ai_positioning = response.shallow_ai_positioning or _has_shallow_ai_positioning(job, tailored)
+    weak_experience_framing = response.weak_experience_framing or _has_weak_experience_framing(job, tailored)
+    credibility_gaps = list(dict.fromkeys(response.credibility_gaps + _credibility_gaps(tailored)))
     return ResumeReview(
-        passed=response.passed,
+        passed=response.passed and not generic_summary and not weak_experience_framing and not shallow_ai_positioning,
         underfilled=response.underfilled or heuristic_underfilled,
+        generic_summary=generic_summary,
+        shallow_ai_positioning=shallow_ai_positioning,
+        weak_experience_framing=weak_experience_framing,
         missing_requirements=response.missing_requirements,
         duplicated_themes=response.duplicated_themes,
         unsupported_claims=response.unsupported_claims,
         trim_suggestions=response.trim_suggestions,
         page_fill_recommendations=page_fill_recommendations,
+        credibility_gaps=credibility_gaps,
         issues=[ReviewIssue(severity=issue.severity, message=issue.message) for issue in response.issues],
     )

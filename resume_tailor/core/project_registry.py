@@ -49,6 +49,11 @@ def parse_projects_md(filepath: str) -> List[ProjectEntry]:
         languages_str = _extract_field(body, "Languages") or ""
         languages = [l.strip() for l in languages_str.split(",") if l.strip()]
 
+        repo_url = _extract_field(body, "Repo") or ""
+        demo_url = _extract_field(body, "Demo") or ""
+        impact_signals_str = _extract_field(body, "Impact") or ""
+        impact_signals = [item.strip() for item in impact_signals_str.split("|") if item.strip()]
+
         entries.append(ProjectEntry(
             name=name,
             path=proj_path,
@@ -56,6 +61,9 @@ def parse_projects_md(filepath: str) -> List[ProjectEntry]:
             tech=tech,
             key_features=key_features,
             languages=languages,
+            repo_url=repo_url,
+            demo_url=demo_url,
+            impact_signals=impact_signals,
         ))
 
     return entries
@@ -84,6 +92,12 @@ def write_projects_md(filepath: str, entries: List[ProjectEntry]) -> None:
             lines.append(f"- **Key-Features:** {' | '.join(entry.key_features)}")
         if entry.languages:
             lines.append(f"- **Languages:** {', '.join(entry.languages)}")
+        if entry.repo_url:
+            lines.append(f"- **Repo:** {entry.repo_url}")
+        if entry.demo_url:
+            lines.append(f"- **Demo:** {entry.demo_url}")
+        if entry.impact_signals:
+            lines.append(f"- **Impact:** {' | '.join(entry.impact_signals)}")
         lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")

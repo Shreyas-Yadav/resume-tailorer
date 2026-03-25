@@ -81,8 +81,11 @@ Return a JSON object with these exact keys:
 - "key_features": list of 3-5 supported technical features
 - "languages": list of languages clearly supported
 - "architecture_signals": list of supported architecture/system design signals
+- "workflow_signals": list of supported workflow/orchestration signals such as tool calling, queues, background jobs, retrieval steps, pipeline stages, or agent loops
+- "automation_signals": list of supported automation signals such as scheduled jobs, asynchronous processing, approvals, ingestion flows, or user-triggered workflows
 - "outcomes": list of supported outcomes or impact statements; qualitative is fine
 - "explicit_metrics": list of explicit quantitative metrics found verbatim or near-verbatim in the source material
+- "result_signals": list of supported non-numeric scale/result signals such as user counts, files processed, latency-sensitive paths, deployment targets, or operational improvements
 - "evidence_summary": compact summary of why this project matters for the job
 - "requirement_tags": list of job-relevant requirement themes this project supports
 
@@ -90,12 +93,13 @@ Rules:
 - Stay grounded in the provided evidence.
 - Do not invent metrics.
 - Only include technologies and outcomes supported by the provided material.
+- Prefer concrete workflow and automation mechanics over generic AI buzzwords.
 - Requirement tags should be short phrases like "backend APIs", "cloud infrastructure", "distributed systems", "data pipelines", "security", "frontend UX", "testing", "databases"."""
 
 
 def project_matching_prompt(job_posting_json: str, projects_json: str, max_projects: int) -> str:
     """Prompt to rank and select registry projects for the tailored resume."""
-    return f"""You are a resume optimization expert. Given a job posting and a set of enriched registry projects, select the smallest high-quality set of projects that covers the role's most important requirements.
+    return f"""You are a resume optimization expert. Given a job posting and a set of enriched registry projects, select the strongest set of projects for a one-page tailored resume.
 
 Also rewrite the professional summary tailored to this role.
 Also propose a tightly targeted skills section.
@@ -111,7 +115,7 @@ Enriched Projects:
 ---
 
 Return a JSON object with these exact keys:
-- "selected_projects": list of 2 to {max_projects} objects, each with:
+- "selected_projects": list of 3 to {max_projects} objects, each with:
   - "name": project name (string)
   - "relevance_score": 0.0 to 1.0 (number)
   - "reasoning": why this project is relevant (string)
@@ -126,10 +130,13 @@ Return a JSON object with these exact keys:
 
 CRITICAL RULES:
 - You MUST ONLY select projects explicitly listed in "Projects Registry" above. Do NOT invent, fabricate, or suggest any project name that is not present in that list.
-- Select 2 to {max_projects} projects, choosing the smallest set that still covers the most important requirement buckets well.
+- Select 3 to {max_projects} projects.
+- Prefer selecting {max_projects} projects when there are enough distinct, relevant candidates and the resume is likely to remain one page.
 - NEVER select two projects that are the same or overlapping. If multiple registry entries refer to the same underlying work, pick only one.
 - Each selected project must be a genuinely distinct project.
 - Optimize for requirement coverage across the set, not just per-project strength.
+- The professional summary must be evidence-based, not generic. Do not use filler like "passionate", "enthusiastic", "eager to contribute", or "team player" unless tied to concrete evidence.
+- If AI/automation is central to the role, the summary must mention actual supported workflow/orchestration depth, not just model or framework names.
 
 Prioritize projects that:
 1. Directly use technologies mentioned in the job posting
@@ -231,6 +238,168 @@ Example STAR-compressed bullet:
 """
 
 
+def bullet_planning_prompt(
+    project_name: str,
+    project_context: str,
+    project_tech: str,
+    job_title: str,
+    job_tech: str,
+    suggested_angle: str,
+    requirement_themes: list,
+    existing_resume_themes: list,
+) -> str:
+    """Prompt to plan distinct high-quality bullets before drafting."""
+    return f"""Plan the 3 strongest resume bullets for this project before drafting them.
+
+Project: {project_name}
+Project context:
+---
+{project_context}
+---
+Technologies used: {project_tech}
+Target role: {job_title}
+Job technologies: {job_tech}
+Suggested framing angle: {suggested_angle}
+Important job requirement themes: {", ".join(requirement_themes)}
+Themes already emphasized elsewhere in the resume: {", ".join(existing_resume_themes) if existing_resume_themes else "(none)"}
+
+Return a JSON object with these exact keys:
+- "display_name": concise project name for the resume heading
+- "tech_stack_display": comma-separated technologies for the heading, ordered by relevance
+- "bullet_plan": list of exactly 3 objects, each with:
+  - "competency": the distinct competency this bullet should highlight
+  - "requirement_theme": the job requirement theme this bullet should address
+  - "evidence": short evidence snippets from the project context that justify the bullet
+  - "target_outcome": the strongest truthful outcome angle for the bullet
+
+Rules:
+- The 3 bullets must cover distinct competencies.
+- Avoid overusing themes already emphasized elsewhere in the resume unless they are critical to the job.
+- Use only evidence grounded in the project context.
+- If exact metrics are unavailable, plan for a strong qualitative outcome instead of a made-up number."""
+
+
+def planned_bullet_generation_prompt(
+    project_name: str,
+    project_context: str,
+    project_tech: str,
+    job_title: str,
+    job_tech: str,
+    bullet_plan_json: str,
+) -> str:
+    """Prompt to draft bullets from a structured bullet plan."""
+    return f"""Generate resume bullet points for this project using the provided bullet plan.
+
+Project: {project_name}
+Project context:
+---
+{project_context}
+---
+Technologies used: {project_tech}
+Target role: {job_title}
+Job technologies: {job_tech}
+Bullet plan:
+---
+{bullet_plan_json}
+---
+
+Return a JSON object with these exact keys:
+- "display_name": concise project name for the resume heading (string)
+- "tech_stack_display": comma-separated technologies for the resume heading, ordered by relevance to the job (string)
+- "bullet_points": list of exactly 3 strings, each a resume bullet point
+
+Rules:
+- Follow the bullet plan exactly: one bullet per planned competency.
+- Start each bullet with a **Bold Heading:** followed by a compact description.
+- Use compressed STAR style within 1-2 lines.
+- Keep each bullet under 220 characters.
+- Use only supported technologies, outcomes, and metrics from the project context.
+- If metrics are unavailable, produce a concrete qualitative outcome instead of generic filler.
+- Make the 3 bullets feel distinct in emphasis and wording."""
+
+
+def bullet_scoring_prompt(
+    project_name: str,
+    job_title: str,
+    requirement_themes: list,
+    bullet_plan_json: str,
+    bullet_points: list,
+) -> str:
+    """Prompt to score bullets and decide which ones need repair."""
+    bullets_str = "\n".join(f"{idx}. {bullet}" for idx, bullet in enumerate(bullet_points))
+    return f"""Score these resume bullets for quality.
+
+Project: {project_name}
+Target role: {job_title}
+Important requirement themes: {", ".join(requirement_themes)}
+Bullet plan:
+---
+{bullet_plan_json}
+---
+
+Bullets:
+---
+{bullets_str}
+---
+
+Return a JSON object with these exact keys:
+- "overall_passes": boolean
+- "duplicated_themes": list of repeated themes across the bullet set
+- "scored_bullets": list of exactly 3 objects, each with:
+  - "bullet_index": 0-based bullet index
+  - "passes": boolean
+  - "scores": list of exactly 6 integers from 1 to 5 in this order:
+    job_alignment, specificity, evidence_grounding, result_strength, distinctiveness, brevity
+  - "issues": short list of problems with the bullet
+  - "repair_instruction": specific rewrite instruction if the bullet should be repaired, otherwise an empty string
+
+Scoring rules:
+- Fail bullets that are vague, repetitive, weakly tied to the plan, or too generic.
+- Prefer concrete architecture/action/result language.
+- Penalize bullets that overlap strongly with another bullet in the same project.
+- Penalize vague outcomes like "improved performance" unless they are made concrete."""
+
+
+def bullet_repair_prompt(
+    project_name: str,
+    project_context: str,
+    project_tech: str,
+    job_title: str,
+    plan_item_json: str,
+    current_bullet: str,
+    repair_instruction: str,
+) -> str:
+    """Prompt to repair one weak bullet while preserving grounding."""
+    return f"""Rewrite this resume bullet to improve its quality while keeping it truthful.
+
+Project: {project_name}
+Project context:
+---
+{project_context}
+---
+Technologies used: {project_tech}
+Target role: {job_title}
+Plan item:
+---
+{plan_item_json}
+---
+Current bullet:
+{current_bullet}
+
+Repair instruction:
+{repair_instruction}
+
+Return a JSON object with exactly one key:
+- "bullet_point": the rewritten bullet
+
+Rules:
+- Preserve the planned competency and requirement theme.
+- Keep the bullet grounded in the project context.
+- Keep compressed STAR style and under 220 characters.
+- Do not invent unsupported metrics or technologies.
+- Make the bullet more specific and differentiated than the current version."""
+
+
 def experience_tailoring_prompt(job_posting_json: str, experience_json: str) -> str:
     """Prompt to tailor existing experience bullets for the target role."""
     return f"""Rewrite the resume experience bullets to better target the job while staying truthful to the original experience.
@@ -311,7 +480,72 @@ Rules:
 - Keep the section compact and ATS-friendly.
 - Prioritize job-relevant items and items supported by the resume/projects.
 - Remove weak, repetitive, or irrelevant tools.
+- Preserve existing coursework unless it is clearly unrelated to the target role.
+- Do not drop all coursework solely to make the section shorter.
 - Do not add unsupported skills."""
+
+
+def summary_rewrite_prompt(job_posting_json: str, projects_json: str, experience_json: str, current_summary: str) -> str:
+    """Prompt to rewrite a weak or generic summary."""
+    return f"""Rewrite this resume summary so it is evidence-based, role-specific, and non-generic.
+
+Job Posting:
+---
+{job_posting_json}
+---
+
+Selected Projects:
+---
+{projects_json}
+---
+
+Experience:
+---
+{experience_json}
+---
+
+Current Summary:
+---
+{current_summary}
+---
+
+Return a JSON object with exactly one key:
+- "professional_summary": rewritten 2-3 sentence summary
+
+Rules:
+- No filler phrases like "passionate", "enthusiastic", "eager to contribute", or "highly motivated".
+- Use concrete evidence from selected projects and experience.
+- If the role is AI/automation-oriented, mention supported workflow, orchestration, or automation depth.
+- Use **bold** only for the most important technologies or capabilities.
+- Keep it concise and strong for a one-page resume."""
+
+
+def experience_repair_prompt(job_posting_json: str, experience_json: str) -> str:
+    """Prompt to reframe weak experience more technically for SWE roles."""
+    return f"""Rewrite these experience entries to sound more technically credible for a software engineering role while staying truthful.
+
+Job Posting:
+---
+{job_posting_json}
+---
+
+Current Experience Entries:
+---
+{experience_json}
+---
+
+Return a JSON object with exactly one key:
+- "entries": list of objects, each with:
+  - "company": exact company name
+  - "role": exact role name
+  - "bullet_points": rewritten technical bullets
+
+Rules:
+- Preserve company and role names exactly.
+- Keep the claims grounded in the current bullets.
+- Reframe teaching/support roles around debugging, systems knowledge, tooling, validation, code review, platform support, and technical scale where supported.
+- Prefer technical credibility over generic mentoring language.
+- Do not invent new projects, tools, or metrics."""
 
 
 def resume_review_prompt(job_posting_json: str, resume_json: str) -> str:
@@ -331,11 +565,15 @@ Tailored Resume Draft:
 Return a JSON object with these exact keys:
 - "passed": boolean
 - "underfilled": boolean indicating whether the resume likely leaves too much empty space on a one-page layout
+- "generic_summary": boolean indicating whether the summary relies on generic filler language rather than evidence
+- "shallow_ai_positioning": boolean indicating whether the resume claims AI/automation relevance without enough concrete workflow/orchestration depth
+- "weak_experience_framing": boolean indicating whether experience reads as too non-technical or too weak for the role
 - "missing_requirements": list of important job requirement themes not covered well
 - "duplicated_themes": list of themes repeated too much across summary/experience/projects
 - "unsupported_claims": list of suspicious claims, metrics, or technologies that may not be grounded
 - "trim_suggestions": list of content that should be shortened or removed to improve one-page quality
 - "page_fill_recommendations": list of specific suggestions to use empty space with higher-signal content
+- "credibility_gaps": list of issues like missing repo/demo links for strong claims or unverifiable project framing
 - "issues": list of objects with:
   - "severity": one of "high", "medium", "low"
   - "message": concise issue description
@@ -343,4 +581,7 @@ Return a JSON object with these exact keys:
 Rules:
 - Focus on relevance, coverage, unsupported claims, and repetition.
 - Mark underfilled=true when the draft appears noticeably short for a one-page resume and there is room for more high-signal content.
+- Mark generic_summary=true when the summary uses low-signal filler or student boilerplate.
+- Mark shallow_ai_positioning=true when AI/automation relevance is asserted but workflow mechanics, orchestration, or supported automation patterns are missing or weak.
+- Mark weak_experience_framing=true when experience sounds too old, too generic, or insufficiently technical for the role and could be reframed more strongly.
 - Mark passed=true only if the resume is strong for the target role without obvious unsupported claims or major gaps."""

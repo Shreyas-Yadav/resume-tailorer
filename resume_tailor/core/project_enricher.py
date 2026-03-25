@@ -27,6 +27,12 @@ def _deep_scan_project(entry: ProjectEntry) -> str:
             parts.append(f"Key features: {' | '.join(entry.key_features)}")
         if entry.languages:
             parts.append(f"Languages: {', '.join(entry.languages)}")
+        if entry.repo_url:
+            parts.append(f"Repo: {entry.repo_url}")
+        if entry.demo_url:
+            parts.append(f"Demo: {entry.demo_url}")
+        if entry.impact_signals:
+            parts.append(f"Impact signals: {' | '.join(entry.impact_signals)}")
         return "\n".join(parts)
 
     return (
@@ -35,6 +41,9 @@ def _deep_scan_project(entry: ProjectEntry) -> str:
         f"Tech: {', '.join(entry.tech)}\n"
         f"Key features: {' | '.join(entry.key_features)}\n"
         f"Languages: {', '.join(entry.languages)}\n\n"
+        f"Repo: {entry.repo_url or '(none)'}\n"
+        f"Demo: {entry.demo_url or '(none)'}\n"
+        f"Impact signals: {' | '.join(entry.impact_signals) if entry.impact_signals else '(none)'}\n\n"
         f"Directory structure:\n{_build_dir_tree(project_root)}\n\n"
         f"README:\n{_read_readme(project_root)}\n\n"
         f"Dependency / build files:\n{_read_dependency_files(project_root)}\n\n"
@@ -91,6 +100,9 @@ def enrich_projects(
                     "tech": entry.tech,
                     "key_features": entry.key_features,
                     "languages": entry.languages,
+                    "repo_url": entry.repo_url,
+                    "demo_url": entry.demo_url,
+                    "impact_signals": entry.impact_signals,
                 },
                 indent=2,
             ),
@@ -111,6 +123,11 @@ def enrich_projects(
                 explicit_metrics=data.explicit_metrics,
                 evidence_summary=data.evidence_summary,
                 requirement_tags=data.requirement_tags,
+                workflow_signals=data.workflow_signals,
+                automation_signals=data.automation_signals,
+                result_signals=data.result_signals,
+                repo_url=entry.repo_url,
+                demo_url=entry.demo_url,
             )
     
     if max_workers == 1:

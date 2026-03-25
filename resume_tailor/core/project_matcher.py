@@ -39,10 +39,15 @@ def match_projects(
             "key_features": p.key_features,
             "languages": p.languages,
             "architecture_signals": p.architecture_signals,
+            "workflow_signals": p.workflow_signals,
+            "automation_signals": p.automation_signals,
             "outcomes": p.outcomes,
             "explicit_metrics": p.explicit_metrics,
+            "result_signals": p.result_signals,
             "evidence_summary": p.evidence_summary,
             "requirement_tags": p.requirement_tags,
+            "repo_url": p.repo_url,
+            "demo_url": p.demo_url,
         }
         for p in enriched_projects
     ]

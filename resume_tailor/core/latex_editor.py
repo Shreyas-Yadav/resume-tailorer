@@ -41,9 +41,15 @@ def _build_projects_section(projects: List[TailoredProject]) -> str:
     for proj in projects:
         name = _markdown_bold_to_latex(proj.name)
         tech = proj.tech_stack_display
+        links = []
+        if proj.repo_url:
+            links.append(rf"\href{{{proj.repo_url}}}{{\underline{{GitHub}}}}")
+        if proj.demo_url:
+            links.append(rf"\href{{{proj.demo_url}}}{{\underline{{Demo}}}}")
+        right_col = " $|$ ".join(links)
         lines.append("")
         lines.append(f"    \\resumeProjectHeading")
-        lines.append(f"        {{\\textbf{{{name}}} $|$ \\emph{{{tech}}}}}{{}}")
+        lines.append(f"        {{\\textbf{{{name}}} $|$ \\emph{{{tech}}}}}{{{right_col}}}")
         lines.append(f"        \\resumeItemListStart")
 
         for bullet in proj.bullet_points:
